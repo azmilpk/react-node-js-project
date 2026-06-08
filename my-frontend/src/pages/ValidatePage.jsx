@@ -5,7 +5,14 @@ import TopNavbar from '../components/topnavbar/TopNavbar';
 function ValidatePage() {
   const navigate = useNavigate();
   const location = useLocation();
+
+  const selectedFacility = location.state?.facility || '';
   const selectedSite = location.state?.site || 'All Facilities';
+  const selectedEntry =
+    location.state?.entry ||
+    (selectedFacility && selectedSite
+      ? `${selectedFacility}-${selectedSite}`
+      : selectedSite);
 
   const [tableData, setTableData] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -13,6 +20,9 @@ function ValidatePage() {
   const [monthFilter, setMonthFilter] = useState('');
   const [yearFilter, setYearFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('Pending');
+
+  const [previewFile, setPreviewFile] = useState(null);
+  const [previewOpen, setPreviewOpen] = useState(false);
 
   useEffect(() => {
     fetchEntries();
@@ -31,6 +41,7 @@ function ValidatePage() {
 
       const mappedData = result.map((item) => ({
         id: item.id,
+        entryNumber: item.entryNumber,
         utility: item.utilityCode || '-',
         facility: item.siteCode || '-',
         accountMeterNo: item.accountMeterNo || '-',
@@ -38,6 +49,8 @@ function ValidatePage() {
         units: item.units || '-',
         recordDate: item.postingMonth || '-',
         status: item.status || 'Pending',
+        fileName: item.fileName || 'No file uploaded',
+        fileUrl: item.fileUrl || '',
       }));
 
       setTableData(mappedData);
@@ -55,17 +68,10 @@ function ValidatePage() {
       const matchSite =
         selectedSite === 'All Facilities' || row.facility === selectedSite;
 
-      const matchUtility =
-        !utilityFilter || row.utility === utilityFilter;
-
-      const matchMonth =
-        !monthFilter || month === monthFilter;
-
-      const matchYear =
-        !yearFilter || year === yearFilter;
-
-      const matchStatus =
-        !statusFilter || row.status === statusFilter;
+      const matchUtility = !utilityFilter || row.utility === utilityFilter;
+      const matchMonth = !monthFilter || month === monthFilter;
+      const matchYear = !yearFilter || year === yearFilter;
+      const matchStatus = !statusFilter || row.status === statusFilter;
 
       return (
         matchSite &&
@@ -109,14 +115,54 @@ function ValidatePage() {
         throw new Error(result.message || 'Failed to update status');
       }
 
-      fetchEntries();
+      setTableData((prev) =>
+        prev.map((item) =>
+          item.id === row.id
+            ? {
+                ...item,
+                status: 'Validated',
+              }
+            : item
+        )
+      );
     } catch (error) {
       console.error('Validate error:', error.message);
     }
   };
 
+  const getFileType = (url = '', name = '') => {
+    const value = `${url} ${name}`.toLowerCase();
+
+    if (
+      value.includes('.png') ||
+      value.includes('.jpg') ||
+      value.includes('.jpeg') ||
+      value.includes('.gif') ||
+      value.includes('.webp')
+    ) {
+      return 'image';
+    }
+
+    if (value.includes('.pdf')) {
+      return 'pdf';
+    }
+
+    return 'unknown';
+  };
+
   const handleDownload = (row) => {
-    console.log('Download clicked:', row);
+    if (!row.fileUrl) {
+      alert('No file available for preview');
+      return;
+    }
+
+    setPreviewFile(row);
+    setPreviewOpen(true);
+  };
+
+  const closePreview = () => {
+    setPreviewOpen(false);
+    setPreviewFile(null);
   };
 
   const utilityOptions = [...new Set(tableData.map((row) => row.utility).filter(Boolean))];
@@ -126,24 +172,21 @@ function ValidatePage() {
       <TopNavbar />
 
       <main className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden px-4 py-4">
-        <section className="w-full max-w-[1320px] mx-auto">
-          {/* Header */}
+        <section className="w-full max-w-[1450px] mx-auto">
           <div className="flex items-center justify-between mb-6">
             <h1 className="text-[28px] sm:text-[36px] lg:text-[44px] xl:text-[48px] leading-tight font-bold text-black">
-              Validate Data - {selectedSite}
+              Validate Data - {selectedEntry}
             </h1>
 
             <button
               type="button"
-              onClick={() => navigate(-1)}
-              className="w-[44px] h-[44px] rounded-full bg-black text-white flex items-center justify-center text-[18px] hover:bg-neutral-800 transition duration-300"
-              aria-label="Go Back"
+              onClick={() => navigate('/site-owner')}
+              className="min-w-[130px] h-[42px] px-5 rounded-full bg-black text-white text-[13px] font-semibold hover:bg-neutral-800 transition duration-300"
             >
-              ↩
+              Go Back
             </button>
           </div>
 
-          {/* Filters */}
           <div className="bg-white rounded-[18px] shadow-sm p-4 mb-6">
             <div className="grid grid-cols-5 gap-4 items-end">
               <div>
@@ -232,10 +275,9 @@ function ValidatePage() {
             </div>
           </div>
 
-          {/* Table */}
           <div className="bg-white rounded-[18px] shadow-sm overflow-hidden">
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[1180px] border-collapse">
+              <table className="w-full min-w-[1280px] border-collapse">
                 <thead>
                   <tr className="bg-black text-white">
                     <th className="px-4 py-3 text-left text-[13px] font-semibold">Utility</th>
@@ -268,7 +310,15 @@ function ValidatePage() {
                         <td className="px-4 py-4 text-[13px] text-black">{row.recordDate}</td>
 
                         <td className="px-4 py-4">
-                          <span className="inline-flex items-center justify-center min-w-[90px] h-[32px] px-3 rounded-full bg-[#f4b400] text-black text-[12px] font-semibold">
+                          <span
+                            className={`inline-flex items-center justify-center min-w-[90px] h-[32px] px-3 rounded-full text-[12px] font-semibold ${
+                              row.status === 'Validated'
+                                ? 'bg-green-600 text-white'
+                                : row.status === 'Rejected'
+                                ? 'bg-red-500 text-white'
+                                : 'bg-[#f4b400] text-black'
+                            }`}
+                          >
                             {row.status}
                           </span>
                         </td>
@@ -277,7 +327,8 @@ function ValidatePage() {
                           <button
                             type="button"
                             onClick={() => handleValidate(row)}
-                            className="h-[34px] px-4 rounded-full bg-[#0078d4] text-white text-[12px] font-semibold hover:bg-[#0062ad] transition duration-300"
+                            disabled={row.status === 'Validated'}
+                            className="h-[34px] px-4 rounded-full bg-[#0078d4] text-white text-[12px] font-semibold hover:bg-[#0062ad] transition duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
                           >
                             Validate
                           </button>
@@ -287,10 +338,9 @@ function ValidatePage() {
                           <button
                             type="button"
                             onClick={() => handleDownload(row)}
-                            className="w-[34px] h-[34px] rounded-full border border-black/20 flex items-center justify-center text-black hover:bg-black hover:text-white transition duration-300"
-                            aria-label="Download File"
+                            className="h-[34px] px-4 rounded-full border border-black/20 text-black text-[12px] font-semibold hover:bg-black hover:text-white transition duration-300"
                           >
-                            ⬇
+                            View File
                           </button>
                         </td>
                       </tr>
@@ -306,7 +356,6 @@ function ValidatePage() {
               </table>
             </div>
 
-            {/* Bottom area */}
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 px-4 py-4 border-t border-black/10">
               <div className="text-[14px] font-semibold text-black">
                 Total Consumption : {totalConsumption}
@@ -314,6 +363,15 @@ function ValidatePage() {
 
               <button
                 type="button"
+                onClick={() =>
+                  navigate('/ul-pure', {
+                    state: {
+                      facility: selectedFacility,
+                      site: selectedSite,
+                      entry: selectedEntry,
+                    },
+                  })
+                }
                 className="h-[40px] px-5 rounded-full bg-black text-white text-[13px] font-semibold hover:bg-neutral-800 transition duration-300 self-start sm:self-auto"
               >
                 Generate Upure Data
@@ -322,6 +380,57 @@ function ValidatePage() {
           </div>
         </section>
       </main>
+
+      {previewOpen && previewFile && (
+        <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4">
+          <div className="w-full max-w-4xl bg-white rounded-[20px] shadow-xl overflow-hidden">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-black/10">
+              <div>
+                <h2 className="text-[18px] font-bold text-black">File Preview</h2>
+                <p className="text-[13px] text-black/60">
+                  {previewFile.fileName || 'Uploaded file'}
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={closePreview}
+                className="min-w-[100px] h-[38px] px-4 rounded-full bg-black text-white text-[12px] font-semibold hover:bg-neutral-800 transition duration-300"
+              >
+                Close
+              </button>
+            </div>
+
+            <div className="p-4 h-[75vh] overflow-auto bg-[#f8f8f8]">
+              {getFileType(previewFile.fileUrl, previewFile.fileName) === 'image' ? (
+                <img
+                  src={previewFile.fileUrl}
+                  alt={previewFile.fileName || 'Uploaded preview'}
+                  className="max-w-full max-h-full mx-auto rounded-[12px]"
+                />
+              ) : getFileType(previewFile.fileUrl, previewFile.fileName) === 'pdf' ? (
+                <iframe
+                  src={previewFile.fileUrl}
+                  title="PDF Preview"
+                  className="w-full h-full min-h-[70vh] rounded-[12px] border border-black/10 bg-white"
+                />
+              ) : (
+                <div className="w-full h-full min-h-[300px] flex flex-col items-center justify-center text-center text-black/60">
+                  <p className="mb-3">Preview is not supported for this file type.</p>
+                  <a
+                    href={previewFile.fileUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center justify-center h-[40px] px-5 rounded-full bg-black text-white text-[13px] font-semibold hover:bg-neutral-800 transition duration-300"
+                  >
+                    Open File
+                  </a>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

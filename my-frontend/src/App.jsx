@@ -4,7 +4,7 @@ import SiteOwnerPage from './pages/SiteOwnerPage';
 import FacilitySelectionPage from './pages/FacilitySelectionPage';
 import FormDetailsPage from './pages/FormDetailsPage';
 import ValidatePage from './pages/ValidatePage';
-import ValidatedDataPage from './pages/ValidatedDataPage';
+import UlPureDetailsPage from './pages/UlPureDetailsPage';
 import UlPurePage from './pages/UlPurePage';
 
 function App() {
@@ -16,7 +16,7 @@ function App() {
         <Route path="/facility-selection" element={<FacilitySelectionPage />} />
         <Route path="/form-details" element={<FormDetailsPage />} />
         <Route path="/validate-data" element={<ValidatePage />} />
-        <Route path="/validated-data" element={<ValidatedDataPage />} />
+        <Route path="/ul-pure-details" element={<UlPureDetailsPage />} />
         <Route path="/ul-pure" element={<UlPurePage />} />
       </Routes>
     </BrowserRouter>

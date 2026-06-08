@@ -2,45 +2,59 @@ import { useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import TopNavbar from '../components/topnavbar/TopNavbar';
 
-
 function FormDetailsPage() {
   const getCurrentMonth = () => {
-  const today = new Date();
-  const year = today.getFullYear();
-  const month = String(today.getMonth() + 1).padStart(2, '0');
-  return `${year}-${month}`;
-};
+    const today = new Date();
+    const year = today.getFullYear();
+    const month = String(today.getMonth() + 1).padStart(2, '0');
+    return `${year}-${month}`;
+  };
+
   const navigate = useNavigate();
   const location = useLocation();
 
+  const selectedFacility = location.state?.facility || '';
   const selectedSite = location.state?.site || 'KOP';
   const selectedUtility = location.state?.utility || 'WATER';
+  const selectedEntry =
+    location.state?.entry ||
+    (selectedFacility && selectedSite
+      ? `${selectedFacility}-${selectedSite}`
+      : selectedSite);
 
   const formConfig = useMemo(() => {
     const configs = {
-      Water: {
+      WATER: {
         fixedFields: [
-          { label: 'Facility', value: selectedSite },
+          { label: 'Facility', value: selectedEntry },
           { label: 'Posting Date Month', value: getCurrentMonth() },
           { label: 'Utility', value: 'WATER' },
           { label: 'Account Number / Meter No', value: '12812696' },
           { label: 'Units', value: 'm3' },
         ],
         editableFields: [
-          { name: 'consumption', label: 'Consumption', placeholder: 'Enter water consumption' },
+          {
+            name: 'consumption',
+            label: 'Consumption',
+            placeholder: 'Enter water consumption',
+          },
           { name: 'attachments', label: 'Attachments', type: 'file' },
         ],
       },
-      Waste: {
+      WASTE: {
         fixedFields: [
-          { label: 'Facility', value: selectedSite },
+          { label: 'Facility', value: selectedEntry },
           { label: 'Posting Date Month', value: getCurrentMonth() },
           { label: 'Utility', value: 'WASTE' },
           { label: 'Waste Category', value: 'General Waste' },
           { label: 'Units', value: 'kg' },
         ],
         editableFields: [
-          { name: 'quantity', label: 'Quantity', placeholder: 'Enter waste quantity' },
+          {
+            name: 'quantity',
+            label: 'Quantity',
+            placeholder: 'Enter waste quantity',
+          },
           { name: 'attachments', label: 'Attachments', type: 'file' },
         ],
       },
@@ -48,18 +62,22 @@ function FormDetailsPage() {
 
     return configs[selectedUtility] || {
       fixedFields: [
-        { label: 'Facility', value: selectedSite },
+        { label: 'Facility', value: selectedEntry },
         { label: 'Posting Date Month', value: getCurrentMonth() },
         { label: 'Utility', value: selectedUtility },
         { label: 'Account Number / Meter No', value: 'DEFAULT-001' },
         { label: 'Units', value: 'unit' },
       ],
       editableFields: [
-        { name: 'consumption', label: 'Consumption', placeholder: 'Enter value' },
+        {
+          name: 'consumption',
+          label: 'Consumption',
+          placeholder: 'Enter value',
+        },
         { name: 'attachments', label: 'Attachments', type: 'file' },
       ],
     };
-  }, [selectedSite, selectedUtility]);
+  }, [selectedEntry, selectedUtility]);
 
   const [formValues, setFormValues] = useState({});
   const [selectedFile, setSelectedFile] = useState(null);
@@ -79,7 +97,9 @@ function FormDetailsPage() {
       setMessage('');
 
       const payload = {
+        facilityCode: selectedFacility,
         siteCode: selectedSite,
+        entryName: selectedEntry,
         utilityCode: selectedUtility,
         postingMonth: formConfig.fixedFields[1]?.value || '',
         accountMeterNo: formConfig.fixedFields[3]?.value || '',
@@ -111,8 +131,12 @@ function FormDetailsPage() {
 
       setTimeout(() => {
         navigate('/facility-selection', {
-    state: { site: selectedSite },
-  });
+          state: {
+            facility: selectedFacility,
+            site: selectedSite,
+            entry: selectedEntry,
+          },
+        });
       }, 1000);
     } catch (error) {
       setMessage(error.message || 'Something went wrong');
@@ -177,38 +201,39 @@ function FormDetailsPage() {
                     </label>
 
                     {field.type === 'file' ? (
-  <div>
-    <label className="block text-[13px] font-semibold text-black mb-2">
-    </label>
+                      <div>
+                        <div className="space-y-3">
+                          <label className="w-full h-[42px] rounded-full bg-black text-white text-[13px] font-semibold flex items-center justify-center cursor-pointer hover:bg-neutral-800 transition duration-300">
+                            Upload File
+                            <input
+                              type="file"
+                              className="hidden"
+                              accept=".pdf,image/*"
+                              onChange={(e) =>
+                                setSelectedFile(e.target.files?.[0] || null)
+                              }
+                            />
+                          </label>
 
-    <div className="space-y-3">
-      <label className="w-full h-[42px] rounded-full bg-black text-white text-[13px] font-semibold flex items-center justify-center cursor-pointer hover:bg-neutral-800 transition duration-300">
-        Upload File
-        <input
-          type="file"
-          className="hidden"
-          accept=".pdf,image/*"
-          onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
-        />
-      </label>
+                          <label className="w-full h-[42px] rounded-full border border-black text-black text-[13px] font-semibold flex items-center justify-center cursor-pointer hover:bg-black hover:text-white transition duration-300">
+                            Take Photo
+                            <input
+                              type="file"
+                              className="hidden"
+                              accept="image/*"
+                              capture="environment"
+                              onChange={(e) =>
+                                setSelectedFile(e.target.files?.[0] || null)
+                              }
+                            />
+                          </label>
 
-      <label className="w-full h-[42px] rounded-full border border-black text-black text-[13px] font-semibold flex items-center justify-center cursor-pointer hover:bg-black hover:text-white transition duration-300">
-        Take Photo
-        <input
-          type="file"
-          className="hidden"
-          accept="image/*"
-          capture="environment"
-          onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
-        />
-      </label>
-
-      <div className="w-full min-h-[60px] rounded-[16px] border border-black/20 bg-[#fafafa] flex items-center justify-center px-4 text-center text-[#666] text-[13px]">
-        {selectedFile ? selectedFile.name : 'No file selected'}
-      </div>
-    </div>
-  </div>
-) : (
+                          <div className="w-full min-h-[60px] rounded-[16px] border border-black/20 bg-[#fafafa] flex items-center justify-center px-4 text-center text-[#666] text-[13px]">
+                            {selectedFile ? selectedFile.name : 'No file selected'}
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
                       <input
                         type="text"
                         value={formValues[field.name] || ''}

@@ -38,7 +38,14 @@ const cards = [
 function FacilitySelectionPage() {
   const navigate = useNavigate();
   const location = useLocation();
+
+  const selectedFacility = location.state?.facility || '';
   const selectedSite = location.state?.site || 'Köping';
+  const selectedEntry =
+    location.state?.entry ||
+    (selectedFacility && selectedSite
+      ? `${selectedFacility}-${selectedSite}`
+      : selectedSite);
 
   return (
     <div className="w-full h-screen bg-[#f5f5f5] flex flex-col overflow-hidden">
@@ -46,10 +53,9 @@ function FacilitySelectionPage() {
 
       <main className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden flex justify-center px-4 py-4">
         <section className="w-full max-w-[1040px] mx-auto">
-          {/* Heading */}
           <div className="text-center mb-5">
             <h1 className="text-[28px] sm:text-[36px] lg:text-[44px] xl:text-[48px] leading-tight font-bold text-black mb-2">
-              Welcome to {selectedSite}
+              Welcome to {selectedEntry}
             </h1>
 
             <p className="text-[14px] sm:text-[16px] lg:text-[18px] text-black max-w-[760px] mx-auto leading-6">
@@ -57,19 +63,24 @@ function FacilitySelectionPage() {
             </p>
           </div>
 
-          {/* Go Back */}
-
-            <div className="flex justify-end mb-6">
+          <div className="flex justify-end mb-6">
             <button
               type="button"
-              onClick={() => navigate('/site-owner')}
+              onClick={() =>
+                navigate('/site-owner', {
+                  state: {
+                    facility: selectedFacility,
+                    site: selectedSite,
+                    entry: selectedEntry,
+                  },
+                })
+              }
               className="min-w-[140px] h-[42px] px-5 rounded-full bg-black text-white text-[13px] font-semibold hover:bg-neutral-800 transition duration-300"
             >
               Go Back
             </button>
           </div>
 
-          {/* Cards */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6 max-w-[980px] mx-auto">
             {cards.map((card) => (
               <div
@@ -97,7 +108,9 @@ function FacilitySelectionPage() {
                   onClick={() =>
                     navigate('/form-details', {
                       state: {
+                        facility: selectedFacility,
                         site: selectedSite,
+                        entry: selectedEntry,
                         utility: card.title,
                       },
                     })

@@ -14,6 +14,7 @@ const insertFormEntry = async (data) => {
     createdBy: data.createdBy || 'frontend-user',
     createdAt: new Date().toISOString(),
     pdfUrl: data.pdfUrl || '',
+    pdfName: data.pdfName || '',
   };
 
   formEntries.push(newEntry);
@@ -53,7 +54,7 @@ const changeFormEntryStatus = async (id, status) => {
   return entry;
 };
 
-tmodule.exports = {
+module.exports = {
   insertFormEntry,
   fetchFormEntries,
   fetchFormEntryById,
