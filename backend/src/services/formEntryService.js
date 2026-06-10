@@ -13,8 +13,9 @@ const insertFormEntry = async (data) => {
     status: data.status || 'Pending',
     createdBy: data.createdBy || 'frontend-user',
     createdAt: new Date().toISOString(),
+    fileName: data.fileName || '',
+    fileUrl: data.fileUrl || '',
     pdfUrl: data.pdfUrl || '',
-    pdfName: data.pdfName || '',
   };
 
   formEntries.push(newEntry);

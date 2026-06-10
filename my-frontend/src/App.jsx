@@ -6,6 +6,7 @@ import FormDetailsPage from './pages/FormDetailsPage';
 import ValidatePage from './pages/ValidatePage';
 import UlPureDetailsPage from './pages/UlPureDetailsPage';
 import UlPurePage from './pages/UlPurePage';
+import ProfilePage from './pages/ProfilePage';
 
 function App() {
   return (
@@ -18,6 +19,7 @@ function App() {
         <Route path="/validate-data" element={<ValidatePage />} />
         <Route path="/ul-pure-details" element={<UlPureDetailsPage />} />
         <Route path="/ul-pure" element={<UlPurePage />} />
+        <Route path="/profile" element={<ProfilePage />} />
       </Routes>
     </BrowserRouter>
   );

@@ -201,9 +201,9 @@ function FormDetailsPage() {
                     </label>
 
                     {field.type === 'file' ? (
-                      <div>
-                        <div className="space-y-3">
-                          <label className="w-full h-[42px] rounded-full bg-black text-white text-[13px] font-semibold flex items-center justify-center cursor-pointer hover:bg-neutral-800 transition duration-300">
+                      <div className="space-y-3">
+                        <div className="flex gap-3">
+                          <label className="flex-1 h-[36px] rounded-full bg-black text-white text-[12px] font-semibold flex items-center justify-center cursor-pointer hover:bg-neutral-800 transition duration-300">
                             Upload File
                             <input
                               type="file"
@@ -215,7 +215,7 @@ function FormDetailsPage() {
                             />
                           </label>
 
-                          <label className="w-full h-[42px] rounded-full border border-black text-black text-[13px] font-semibold flex items-center justify-center cursor-pointer hover:bg-black hover:text-white transition duration-300">
+                          <label className="flex-1 h-[36px] rounded-full border border-black text-black text-[12px] font-semibold flex items-center justify-center cursor-pointer hover:bg-black hover:text-white transition duration-300">
                             Take Photo
                             <input
                               type="file"
@@ -227,10 +227,10 @@ function FormDetailsPage() {
                               }
                             />
                           </label>
+                        </div>
 
-                          <div className="w-full min-h-[60px] rounded-[16px] border border-black/20 bg-[#fafafa] flex items-center justify-center px-4 text-center text-[#666] text-[13px]">
-                            {selectedFile ? selectedFile.name : 'No file selected'}
-                          </div>
+                        <div className="w-full min-h-[52px] rounded-[14px] border border-black/20 bg-[#fafafa] flex items-center justify-center px-4 text-center text-[#666] text-[12px]">
+                          {selectedFile ? selectedFile.name : 'No file selected'}
                         </div>
                       </div>
                     ) : (

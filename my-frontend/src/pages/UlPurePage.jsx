@@ -194,7 +194,7 @@ function UlPurePage() {
                 <button
                   type="button"
                   onClick={handleResetFilters}
-                  className="w-full h-[42px] rounded-full bg-black text-white text-[13px] font-semibold hover:bg-neutral-800 transition duration-300"
+                  className="h-[42px] px-5 rounded-full bg-black text-white text-[13px] font-semibold hover:bg-neutral-800 transition duration-300"
                 >
                   Reset Filter
                 </button>

@@ -374,7 +374,7 @@ function ValidatePage() {
                 }
                 className="h-[40px] px-5 rounded-full bg-black text-white text-[13px] font-semibold hover:bg-neutral-800 transition duration-300 self-start sm:self-auto"
               >
-                Generate Upure Data
+                Generate ULpure Data
               </button>
             </div>
           </div>
