@@ -25,38 +25,75 @@ function UlPurePage() {
       setLoading(true);
 
       const response = await fetch(
-        'http://localhost:5000/api/form-entries?status=Validated'
-      );
+  'http://localhost:5000/api/form-entries'
+);
+      
       const result = await response.json();
 
       if (!response.ok) {
         throw new Error(result.message || 'Failed to fetch validated entries');
       }
 
-      const mappedData = result.map((item) => {
-        const facility = item.facilityCode || selectedFacilityFromNav || '';
-        const site = item.siteCode || '-';
+      const mappedData = result
+  .filter(
+    (item) =>
+      item.Status === 'Validated' ||
+      item.Status === 'Modified'
+  )
+  .map((item) => {
+        const facility =
+          item.FacilityCode ||
+          item.facilityCode ||
+          selectedFacilityFromNav ||
+          '';
+
+        const site =
+          item.SiteCode ||
+          item.siteCode ||
+          '-';
+
         const entry =
+          item.EntryName ||
           item.entryName ||
           (facility && site !== '-' ? `${facility}-${site}` : site);
 
         return {
-          id: item.id,
-          entryNumber: item.entryNumber,
-          facility,
-          site,
-          entry,
-          utility: item.utilityCode || '-',
-          accountMeterNo: item.accountMeterNo || '-',
-          consumption: item.consumption || '-',
-          units: item.units || '-',
-          postingMonth: item.postingMonth || '-',
-          status: item.status || '-',
-          fileName: item.fileName || 'No file uploaded',
-          fileUrl: item.fileUrl || '',
-        };
-      });
+  Id: item.Id,
+  id: item.Id,
 
+  entryNumber: item.EntryNumber || item.entryNumber,
+
+  facility,
+  site,
+  entry,
+
+  utility: item.UtilityCode || item.utilityCode || '-',
+
+  accountMeterNo:
+    item.AccountMeterNo || item.accountMeterNo || '-',
+
+  consumption:
+    item.Consumption || item.consumption || '-',
+
+  units:
+    item.Units || item.units || '-',
+
+  postingMonth:
+    item.PostingMonth || item.postingMonth || '-',
+
+  status:
+    item.Status || item.status || '-',
+
+  fileName:
+    item.FileName || item.fileName || 'No file uploaded',
+
+  fileUrl:
+    item.FileUrl || item.fileUrl || '',
+    comment: 
+    item.Comment || item.comment || '',
+};
+      });
+console.log(mappedData);
       setTableData(mappedData);
     } catch (error) {
       console.error('UL Pure fetch error:', error.message);
@@ -79,11 +116,14 @@ function UlPurePage() {
   }, [tableData, selectedSiteFromNav, utilityFilter, monthFilter, yearFilter]);
 
   const utilityOptions = [...new Set(tableData.map((row) => row.utility).filter(Boolean))];
-  const yearOptions = [...new Set(
-    tableData
-      .map((row) => (row.postingMonth || '').split('-')[0])
-      .filter(Boolean)
-  )].sort();
+
+  const yearOptions = [
+    ...new Set(
+      tableData
+        .map((row) => (row.postingMonth || '').split('-')[0])
+        .filter(Boolean)
+    ),
+  ].sort();
 
   const totalConsumption = filteredData.reduce((sum, row) => {
     return sum + Number(row.consumption || 0);
@@ -118,7 +158,6 @@ function UlPurePage() {
               type="button"
               onClick={() => navigate('/site-owner')}
               className="min-w-[130px] h-[42px] px-5 rounded-full bg-black text-white text-[13px] font-semibold hover:bg-neutral-800 transition duration-300"
-              aria-label="Go Back"
             >
               Go Back
             </button>

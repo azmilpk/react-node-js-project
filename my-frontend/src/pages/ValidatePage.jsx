@@ -40,17 +40,17 @@ function ValidatePage() {
       }
 
       const mappedData = result.map((item) => ({
-        id: item.id,
-        entryNumber: item.entryNumber,
-        utility: item.utilityCode || '-',
-        facility: item.siteCode || '-',
-        accountMeterNo: item.accountMeterNo || '-',
-        consumption: item.consumption || '-',
-        units: item.units || '-',
-        recordDate: item.postingMonth || '-',
-        status: item.status || 'Pending',
-        fileName: item.fileName || 'No file uploaded',
-        fileUrl: item.fileUrl || '',
+        id: item.Id || item.id,
+        entryNumber: item.EntryNumber || item.entryNumber,
+        utility: item.UtilityCode || item.utilityCode || '-',
+        facility: item.SiteCode || item.siteCode || '-',
+        accountMeterNo: item.AccountMeterNo || item.accountMeterNo || '-',
+        consumption: item.Consumption || item.consumption || '-',
+        units: item.Units || item.units || '-',
+        recordDate: item.PostingMonth || item.postingMonth || '-',
+        status: item.Status || item.status || 'Pending',
+        fileName: item.FileName || item.fileName || 'No file uploaded',
+        fileUrl: item.FileUrl || item.fileUrl || '',
       }));
 
       setTableData(mappedData);
@@ -156,7 +156,14 @@ function ValidatePage() {
       return;
     }
 
-    setPreviewFile(row);
+    const previewUrl = `http://localhost:5000/api/files/view?blobUrl=${encodeURIComponent(
+      row.fileUrl
+    )}`;
+
+    setPreviewFile({
+      ...row,
+      previewUrl,
+    });
     setPreviewOpen(true);
   };
 
@@ -404,13 +411,13 @@ function ValidatePage() {
             <div className="p-4 h-[75vh] overflow-auto bg-[#f8f8f8]">
               {getFileType(previewFile.fileUrl, previewFile.fileName) === 'image' ? (
                 <img
-                  src={previewFile.fileUrl}
+                  src={previewFile.previewUrl}
                   alt={previewFile.fileName || 'Uploaded preview'}
                   className="max-w-full max-h-full mx-auto rounded-[12px]"
                 />
               ) : getFileType(previewFile.fileUrl, previewFile.fileName) === 'pdf' ? (
                 <iframe
-                  src={previewFile.fileUrl}
+                  src={previewFile.previewUrl}
                   title="PDF Preview"
                   className="w-full h-full min-h-[70vh] rounded-[12px] border border-black/10 bg-white"
                 />
@@ -418,7 +425,7 @@ function ValidatePage() {
                 <div className="w-full h-full min-h-[300px] flex flex-col items-center justify-center text-center text-black/60">
                   <p className="mb-3">Preview is not supported for this file type.</p>
                   <a
-                    href={previewFile.fileUrl}
+                    href={previewFile.previewUrl}
                     target="_blank"
                     rel="noreferrer"
                     className="inline-flex items-center justify-center h-[40px] px-5 rounded-full bg-black text-white text-[13px] font-semibold hover:bg-neutral-800 transition duration-300"

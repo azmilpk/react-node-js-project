@@ -2,7 +2,6 @@ import { useNavigate } from 'react-router-dom';
 import TopNavbar from '../components/topnavbar/TopNavbar';
 import homeImage from '../assets/images/HomeBack2.png';
 import volvoLogo from '../assets/images/VolvoLogo.png';
-import { loginUser } from '../utils/auth';
 
 function HomePage() {
   const navigate = useNavigate();
@@ -10,23 +9,19 @@ function HomePage() {
   const userId = 'Bot_02';
 
   const handleAuditorLogin = () => {
-    loginUser({
-      name: 'Bot_02',
-      userId: 'HyperAuto_DT_FP',
-      role: 'Auditor',
+    navigate('/login', {
+      state: {
+        role: 'Auditor',
+      },
     });
-
-    navigate('/validated-data');
   };
 
   const handleSiteOwnerLogin = () => {
-    loginUser({
-      name: 'Bot_02',
-      userId: 'HyperAuto_DT_FP',
-      role: 'SiteOwner',
+    navigate('/login', {
+      state: {
+        role: 'SiteOwner',
+      },
     });
-
-    navigate('/site-owner');
   };
 
   return (
@@ -62,11 +57,11 @@ function HomePage() {
 
             <div className="flex flex-col items-center gap-4">
               <button
-               type="button"
-               onClick={() => navigate('/ul-pure')}
-               className="w-full max-w-[220px] h-11 rounded-full bg-black text-white text-sm sm:text-base font-semibold hover:opacity-80 transition-all duration-300"
->
-               Auditor
+                type="button"
+                onClick={handleAuditorLogin}
+                className="w-full max-w-[220px] h-11 rounded-full bg-black text-white text-sm sm:text-base font-semibold hover:opacity-80 transition-all duration-300"
+              >
+                Auditor
               </button>
 
               <button

@@ -1,9 +1,46 @@
-let formEntries = [];
+const db = require('../config/db');
 
-const insertFormEntry = async (data) => {
-  const newEntry = {
-    id: formEntries.length + 1,
-    entryNumber: `ENTRY-${Date.now()}`,
+// Create Entry
+const insertFormEntry = (data) => {
+  const entryNumber = `ENTRY-${Date.now()}`;
+
+  const stmt = db.prepare(`
+    INSERT INTO FormEntries
+    (
+      EntryNumber,
+      SiteCode,
+      UtilityCode,
+      PostingMonth,
+      AccountMeterNo,
+      Units,
+      Consumption,
+      Status,
+      CreatedBy,
+      FileName,
+      FileUrl,
+      PdfUrl,
+      Comment
+    )
+    VALUES
+    (
+      @entryNumber,
+      @siteCode,
+      @utilityCode,
+      @postingMonth,
+      @accountMeterNo,
+      @units,
+      @consumption,
+      @status,
+      @createdBy,
+      @fileName,
+      @fileUrl,
+      @pdfUrl,
+      @comment
+    )
+  `);
+
+  const result = stmt.run({
+    entryNumber,
     siteCode: data.siteCode || '',
     utilityCode: data.utilityCode || '',
     postingMonth: data.postingMonth || '',
@@ -12,47 +49,102 @@ const insertFormEntry = async (data) => {
     consumption: data.consumption || '',
     status: data.status || 'Pending',
     createdBy: data.createdBy || 'frontend-user',
-    createdAt: new Date().toISOString(),
     fileName: data.fileName || '',
     fileUrl: data.fileUrl || '',
     pdfUrl: data.pdfUrl || '',
-  };
+    comment: data.comment || '',
+  });
 
-  formEntries.push(newEntry);
-  return newEntry;
+  return db
+    .prepare('SELECT * FROM FormEntries WHERE Id = ?')
+    .get(result.lastInsertRowid);
 };
 
-const fetchFormEntries = async (query) => {
-  let results = [...formEntries];
+// Get All Entries
+const fetchFormEntries = (query) => {
+  let sql = 'SELECT * FROM FormEntries WHERE 1=1';
+  const params = [];
 
   if (query.siteCode) {
-    results = results.filter((item) => item.siteCode === query.siteCode);
+    sql += ' AND SiteCode = ?';
+    params.push(query.siteCode);
   }
 
   if (query.utilityCode) {
-    results = results.filter((item) => item.utilityCode === query.utilityCode);
+    sql += ' AND UtilityCode = ?';
+    params.push(query.utilityCode);
   }
 
   if (query.status) {
-    results = results.filter((item) => item.status === query.status);
+    sql += ' AND Status = ?';
+    params.push(query.status);
   }
 
-  return results;
+  return db.prepare(sql).all(...params);
 };
 
-const fetchFormEntryById = async (id) => {
-  return formEntries.find((item) => item.id === Number(id));
+// Get Entry By Id
+const fetchFormEntryById = (id) => {
+  return db.prepare('SELECT * FROM FormEntries WHERE Id = ?').get(id);
 };
 
-const changeFormEntryStatus = async (id, status) => {
-  const entry = formEntries.find((item) => item.id === Number(id));
+// Change Status
+const changeFormEntryStatus = (id, status) => {
+  const entry = db
+    .prepare('SELECT * FROM FormEntries WHERE Id = ?')
+    .get(id);
 
   if (!entry) {
     throw new Error('Entry not found');
   }
 
-  entry.status = status;
-  return entry;
+  db.prepare(`
+    UPDATE FormEntries
+    SET Status = ?
+    WHERE Id = ?
+  `).run(status, id);
+
+  return db
+    .prepare('SELECT * FROM FormEntries WHERE Id = ?')
+    .get(id);
+};
+
+// Update Entry From UL Pure Details
+const updateFormEntry = (id, data) => {
+  console.log('==============================');
+  console.log('UPDATE REQUEST RECEIVED');
+  console.log('ID =', id);
+  console.log('DATA =', data);
+
+  const entry = db
+    .prepare('SELECT * FROM FormEntries WHERE Id = ?')
+    .get(id);
+
+  console.log('FOUND ENTRY =', entry);
+
+  if (!entry) {
+    throw new Error('Entry not found');
+  }
+
+  db.prepare(`
+    UPDATE FormEntries
+    SET
+      PostingMonth = ?,
+      Consumption = ?,
+      Comment = ?,
+      Status = ?
+    WHERE Id = ?
+  `).run(
+    data.postingMonth || entry.PostingMonth,
+    data.consumption || entry.Consumption,
+    data.comment || entry.Comment || '',
+    'Modified',
+    id
+  );
+
+  return db
+    .prepare('SELECT * FROM FormEntries WHERE Id = ?')
+    .get(id);
 };
 
 module.exports = {
@@ -60,4 +152,5 @@ module.exports = {
   fetchFormEntries,
   fetchFormEntryById,
   changeFormEntryStatus,
+  updateFormEntry,
 };

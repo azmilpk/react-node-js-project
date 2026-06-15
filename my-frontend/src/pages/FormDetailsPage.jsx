@@ -58,6 +58,74 @@ function FormDetailsPage() {
           { name: 'attachments', label: 'Attachments', type: 'file' },
         ],
       },
+      'Energy Consumption': {
+        fixedFields: [
+          { label: 'Facility', value: selectedEntry },
+          { label: 'Posting Date Month', value: getCurrentMonth() },
+          { label: 'Utility', value: 'Energy Consumption' },
+          { label: 'Account Number / Meter No', value: 'DEFAULT-001' },
+          { label: 'Units', value: 'unit' },
+        ],
+        editableFields: [
+          {
+            name: 'consumption',
+            label: 'Consumption',
+            placeholder: 'Enter energy consumption',
+          },
+          { name: 'attachments', label: 'Attachments', type: 'file' },
+        ],
+      },
+      'Fuel Consumption': {
+        fixedFields: [
+          { label: 'Facility', value: selectedEntry },
+          { label: 'Posting Date Month', value: getCurrentMonth() },
+          { label: 'Utility', value: 'Fuel Consumption' },
+          { label: 'Account Number / Meter No', value: 'DEFAULT-001' },
+          { label: 'Units', value: 'litres' },
+        ],
+        editableFields: [
+          {
+            name: 'consumption',
+            label: 'Consumption',
+            placeholder: 'Enter fuel consumption',
+          },
+          { name: 'attachments', label: 'Attachments', type: 'file' },
+        ],
+      },
+      'Produced Units': {
+        fixedFields: [
+          { label: 'Facility', value: selectedEntry },
+          { label: 'Posting Date Month', value: getCurrentMonth() },
+          { label: 'Utility', value: 'Produced Units' },
+          { label: 'Account Number / Meter No', value: 'DEFAULT-001' },
+          { label: 'Units', value: 'unit' },
+        ],
+        editableFields: [
+          {
+            name: 'producedQuantity',
+            label: 'Produced Quantity',
+            placeholder: 'Enter produced quantity',
+          },
+          { name: 'attachments', label: 'Attachments', type: 'file' },
+        ],
+      },
+      Diesel: {
+        fixedFields: [
+          { label: 'Facility', value: selectedEntry },
+          { label: 'Posting Date Month', value: getCurrentMonth() },
+          { label: 'Utility', value: 'Diesel' },
+          { label: 'Account Number / Meter No', value: 'DEFAULT-001' },
+          { label: 'Units', value: 'litres' },
+        ],
+        editableFields: [
+          {
+            name: 'consumption',
+            label: 'Consumption',
+            placeholder: 'Enter diesel consumption',
+          },
+          { name: 'attachments', label: 'Attachments', type: 'file' },
+        ],
+      },
     };
 
     return configs[selectedUtility] || {
@@ -96,6 +164,32 @@ function FormDetailsPage() {
       setIsSubmitting(true);
       setMessage('');
 
+      let uploadedFileData = {
+        fileName: '',
+        fileUrl: '',
+      };
+
+      if (selectedFile) {
+        const fileFormData = new FormData();
+        fileFormData.append('file', selectedFile);
+
+        const uploadResponse = await fetch('http://localhost:5000/api/files/upload', {
+          method: 'POST',
+          body: fileFormData,
+        });
+
+        const uploadResult = await uploadResponse.json();
+
+        if (!uploadResponse.ok) {
+          throw new Error(uploadResult.message || 'File upload failed');
+        }
+
+        uploadedFileData = {
+          fileName: uploadResult.fileName,
+          fileUrl: uploadResult.fileUrl,
+        };
+      }
+
       const payload = {
         facilityCode: selectedFacility,
         siteCode: selectedSite,
@@ -111,6 +205,8 @@ function FormDetailsPage() {
           '',
         status: 'Pending',
         createdBy: 'Bot_02',
+        fileName: uploadedFileData.fileName,
+        fileUrl: uploadedFileData.fileUrl,
       };
 
       const response = await fetch('http://localhost:5000/api/form-entries', {

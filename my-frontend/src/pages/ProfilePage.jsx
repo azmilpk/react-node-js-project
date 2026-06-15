@@ -3,6 +3,7 @@ import TopNavbar from '../components/topnavbar/TopNavbar';
 
 function ProfilePage() {
   const navigate = useNavigate();
+  const user = JSON.parse(localStorage.getItem('authUser'));
 
   return (
     <div className="w-full h-screen bg-[#f5f5f5] flex flex-col overflow-hidden">
@@ -25,9 +26,9 @@ function ProfilePage() {
           </div>
 
           <div className="space-y-4 text-[15px] text-black">
-            <div><strong>Name:</strong> Bot_02</div>
-            <div><strong>User ID:</strong> HyperAuto_DT_FP</div>
-            <div><strong>Role:</strong> Auditor / Site Owner</div>
+            <div><strong>Name:</strong> {user?.name || '-'}</div>
+            <div><strong>User ID:</strong> {user?.userId || '-'}</div>
+            <div><strong>Role:</strong> {user?.role || '-'}</div>
             <div><strong>Application:</strong> TTI ENV IDP</div>
           </div>
         </section>

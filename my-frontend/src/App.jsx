@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import HomePage from './pages/HomePage';
+import LoginPage from './pages/LoginPage';
 import SiteOwnerPage from './pages/SiteOwnerPage';
 import FacilitySelectionPage from './pages/FacilitySelectionPage';
 import FormDetailsPage from './pages/FormDetailsPage';
@@ -13,6 +14,7 @@ function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<HomePage />} />
+        <Route path="/login" element={<LoginPage />} />
         <Route path="/site-owner" element={<SiteOwnerPage />} />
         <Route path="/facility-selection" element={<FacilitySelectionPage />} />
         <Route path="/form-details" element={<FormDetailsPage />} />

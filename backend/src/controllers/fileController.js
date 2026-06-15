@@ -1,4 +1,4 @@
-const { uploadToBlob } = require('../services/fileService');
+const { uploadToBlob, streamBlobToResponse } = require('../services/fileService');
 
 const uploadFile = async (req, res, next) => {
   try {
@@ -13,4 +13,21 @@ const uploadFile = async (req, res, next) => {
   }
 };
 
-module.exports = { uploadFile };
+const viewFile = async (req, res, next) => {
+  try {
+    const { blobUrl } = req.query;
+
+    if (!blobUrl) {
+      return res.status(400).json({ message: 'blobUrl is required' });
+    }
+
+    await streamBlobToResponse(blobUrl, res);
+  } catch (error) {
+    next(error);
+  }
+};
+
+module.exports = {
+  uploadFile,
+  viewFile,
+};

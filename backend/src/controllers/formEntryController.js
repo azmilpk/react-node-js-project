@@ -3,32 +3,38 @@ const {
   fetchFormEntries,
   fetchFormEntryById,
   changeFormEntryStatus,
+  updateFormEntry: updateFormEntryService,
 } = require('../services/formEntryService');
 
-const createFormEntry = async (req, res, next) => {
+// Create Entry
+const createFormEntry = (req, res, next) => {
   try {
-    const result = await insertFormEntry(req.body);
+    const result = insertFormEntry(req.body);
     res.status(201).json(result);
   } catch (error) {
     next(error);
   }
 };
 
-const getFormEntries = async (req, res, next) => {
+// Get All Entries
+const getFormEntries = (req, res, next) => {
   try {
-    const result = await fetchFormEntries(req.query);
+    const result = fetchFormEntries(req.query);
     res.json(result);
   } catch (error) {
     next(error);
   }
 };
 
-const getFormEntryById = async (req, res, next) => {
+// Get Entry By Id
+const getFormEntryById = (req, res, next) => {
   try {
-    const result = await fetchFormEntryById(req.params.id);
+    const result = fetchFormEntryById(req.params.id);
 
     if (!result) {
-      return res.status(404).json({ message: 'Entry not found' });
+      return res.status(404).json({
+        message: 'Entry not found',
+      });
     }
 
     res.json(result);
@@ -37,9 +43,28 @@ const getFormEntryById = async (req, res, next) => {
   }
 };
 
-const updateFormEntryStatus = async (req, res, next) => {
+// Change Status
+const updateFormEntryStatus = (req, res, next) => {
   try {
-    const result = await changeFormEntryStatus(req.params.id, req.body.status);
+    const result = changeFormEntryStatus(
+      req.params.id,
+      req.body.status
+    );
+
+    res.json(result);
+  } catch (error) {
+    next(error);
+  }
+};
+
+// Update Entry (UL Pure Details Page)
+const editFormEntry = (req, res, next) => {
+  try {
+    const result = updateFormEntryService(
+      req.params.id,
+      req.body
+    );
+
     res.json(result);
   } catch (error) {
     next(error);
@@ -51,4 +76,5 @@ module.exports = {
   getFormEntries,
   getFormEntryById,
   updateFormEntryStatus,
+  editFormEntry,
 };
