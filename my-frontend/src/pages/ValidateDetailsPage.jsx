@@ -2,7 +2,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { useState } from 'react';
 import TopNavbar from '../components/topnavbar/TopNavbar';
 
-function UlPureDetailsPage() {
+function ValidateDetailsPage() {
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -16,7 +16,19 @@ function UlPureDetailsPage() {
 
   const authUser = JSON.parse(localStorage.getItem('authUser'));
 
-  const [postingMonth, setPostingMonth] = useState(selectedEntry?.postingMonth || '');
+  const facilityValue =
+    selectedEntry?.facilityCode ||
+    selectedEntry?.facility ||
+    '';
+
+  const subsiteValue =
+    selectedEntry?.siteCode ||
+    selectedEntry?.site ||
+    '';
+
+  const [postingMonth, setPostingMonth] = useState(
+    selectedEntry?.postingMonth || selectedEntry?.recordDate || ''
+  );
   const [consumption, setConsumption] = useState(selectedEntry?.consumption || '');
   const [comment, setComment] = useState(selectedEntry?.comment || '');
 
@@ -41,10 +53,22 @@ function UlPureDetailsPage() {
   };
 
   const previewUrl = selectedEntry?.fileUrl
-  ? `http://localhost:5000/api/files/view?blobUrl=${encodeURIComponent(
-      selectedEntry.fileUrl
-    )}`
-  : '';
+    ? `http://localhost:5000/api/files/view?blobUrl=${encodeURIComponent(selectedEntry.fileUrl)}`
+    : '';
+
+  const goBackToValidate = () => {
+    navigate('/validate-data', {
+      state: {
+        facility: selectedFacility,
+        site: selectedSite,
+        entry: selectedEntryLabel,
+      },
+    });
+  };
+
+const getAuthUser = () => {
+  return JSON.parse(localStorage.getItem('authUser'));
+};
 
   const handleSave = async () => {
     try {
@@ -56,7 +80,7 @@ function UlPureDetailsPage() {
       const entryId = selectedEntry?.id || selectedEntry?.Id;
 
       const response = await fetch(
-        `http://localhost:5000/api/ul-pure-entries/${entryId}`,
+        `http://localhost:5000/api/form-entries/${entryId}`,
         {
           method: 'PUT',
           headers: {
@@ -66,7 +90,7 @@ function UlPureDetailsPage() {
             postingMonth,
             consumption,
             comment,
-            modifiedBy: authUser?.name || authUser?.userId || 'Unknown User',
+            modifiedBy: getAuthUser()?.name || getAuthUser()?.userId || 'Unknown User',
           }),
         }
       );
@@ -74,12 +98,12 @@ function UlPureDetailsPage() {
       const result = await response.json();
 
       if (!response.ok) {
-        throw new Error(result.message || 'Failed to update UL Pure entry');
+        throw new Error(result.message || 'Failed to update entry');
       }
 
       alert('Entry updated successfully');
 
-      navigate('/ul-pure', {
+      navigate('/validate-data', {
         state: {
           facility: selectedFacility,
           site: selectedSite,
@@ -88,7 +112,7 @@ function UlPureDetailsPage() {
       });
     } catch (error) {
       console.error(error);
-      alert(error.message || 'Failed to update UL Pure entry');
+      alert(error.message || 'Failed to update entry');
     }
   };
 
@@ -100,20 +124,12 @@ function UlPureDetailsPage() {
         <section className="w-full max-w-[1450px] h-full mx-auto flex flex-col">
           <div className="flex items-center justify-between mb-4 shrink-0">
             <h1 className="text-[28px] sm:text-[36px] lg:text-[44px] xl:text-[48px] leading-tight font-bold text-black">
-              UL Pure Details
+              Validate Details
             </h1>
 
             <button
               type="button"
-              onClick={() =>
-                navigate('/ul-pure', {
-                  state: {
-                    facility: selectedFacility,
-                    site: selectedSite,
-                    entry: selectedEntryLabel,
-                  },
-                })
-              }
+              onClick={goBackToValidate}
               className="min-w-[130px] h-[42px] px-5 rounded-full bg-black text-white text-[13px] font-semibold hover:bg-neutral-800 transition duration-300 shrink-0"
             >
               Go Back
@@ -144,7 +160,7 @@ function UlPureDetailsPage() {
                           Facility
                         </td>
                         <td className="px-4 py-3 text-[13px] text-black">
-                          {selectedEntry.facility}
+                          {facilityValue}
                         </td>
                       </tr>
 
@@ -153,7 +169,7 @@ function UlPureDetailsPage() {
                           Subsite
                         </td>
                         <td className="px-4 py-3 text-[13px] text-black">
-                          {selectedEntry.site}
+                          {subsiteValue}
                         </td>
                       </tr>
 
@@ -218,14 +234,18 @@ function UlPureDetailsPage() {
                         </td>
                         <td className="px-4 py-3 text-[13px] text-black">
                           <span
-  className={`inline-flex items-center justify-center min-w-[120px] h-[32px] px-3 rounded-full text-white text-[12px] font-semibold ${
-    selectedEntry.status === 'Validated'
-      ? 'bg-green-600'
-      : 'bg-sky-500'
-  }`}
->
-  {selectedEntry.status}
-</span>
+                            className={`inline-flex items-center justify-center min-w-[90px] h-[32px] px-3 rounded-full text-white text-[12px] font-semibold ${
+                              selectedEntry.status === 'Modified and Validated'
+                                ? 'bg-gray-600'
+                                : selectedEntry.status === 'Validated'
+                                ? 'bg-green-600'
+                                : selectedEntry.status === 'Rejected'
+                                ? 'bg-red-500'
+                                : 'bg-[#f4b400] text-black'
+                            }`}
+                          >
+                            {selectedEntry.status}
+                          </span>
                         </td>
                       </tr>
 
@@ -321,4 +341,4 @@ function UlPureDetailsPage() {
   );
 }
 
-export default UlPureDetailsPage;
+export default ValidateDetailsPage;

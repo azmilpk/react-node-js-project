@@ -1,5 +1,6 @@
 import { useLocation, useNavigate } from 'react-router-dom';
 import TopNavbar from '../components/topnavbar/TopNavbar';
+import { siteUtilityConfig } from '../config/siteUtilityConfig';
 
 import energyIcon from '../assets/facilityvectors/energy.svg';
 import fuelIcon from '../assets/facilityvectors/gas.svg';
@@ -8,44 +9,31 @@ import wasteIcon from '../assets/facilityvectors/waste.svg';
 import waterIcon from '../assets/facilityvectors/water.svg';
 import dieselIcon from '../assets/facilityvectors/diesel.svg';
 
-const cards = [
-  {
-    title: 'Energy Consumption',
-    icon: energyIcon,
-  },
-  {
-    title: 'Fuel Consumption',
-    icon: fuelIcon,
-  },
-  {
-    title: 'Produced Units',
-    icon: producedUnitsIcon,
-  },
-  {
-    title: 'Waste',
-    icon: wasteIcon,
-  },
-  {
-    title: 'Water',
-    icon: waterIcon,
-  },
-  {
-    title: 'Diesel',
-    icon: dieselIcon,
-  },
-];
+const iconMap = {
+  energy: energyIcon,
+  fuel: fuelIcon,
+  producedUnits: producedUnitsIcon,
+  waste: wasteIcon,
+  water: waterIcon,
+  diesel: dieselIcon,
+};
 
 function FacilitySelectionPage() {
   const navigate = useNavigate();
   const location = useLocation();
 
   const selectedFacility = location.state?.facility || '';
-  const selectedSite = location.state?.site || 'Köping';
+  const selectedSite = location.state?.site || '';
   const selectedEntry =
     location.state?.entry ||
     (selectedFacility && selectedSite
       ? `${selectedFacility}-${selectedSite}`
-      : selectedSite);
+      : selectedSite || selectedFacility);
+
+  const cards =
+    siteUtilityConfig[selectedSite] ||
+    siteUtilityConfig[selectedFacility] ||
+    [];
 
   return (
     <div className="w-full h-screen bg-[#f5f5f5] flex flex-col overflow-hidden">
@@ -59,7 +47,7 @@ function FacilitySelectionPage() {
             </h1>
 
             <p className="text-[14px] sm:text-[16px] lg:text-[18px] text-black max-w-[760px] mx-auto leading-6">
-              What would you like to do today? Select the Facility for which you want to enter the data
+              What would you like to do today? Select the utility for which you want to enter the data
             </p>
           </div>
 
@@ -81,26 +69,32 @@ function FacilitySelectionPage() {
             </button>
           </div>
 
+          {cards.length === 0 && (
+            <p className="text-center text-sm text-black mb-6">
+              No utilities configured for this site.
+            </p>
+          )}
+
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6 max-w-[980px] mx-auto">
             {cards.map((card) => (
               <div
-                key={card.title}
+                key={card.utilityCode}
                 className="bg-black rounded-[22px] px-4 py-5 min-h-[230px] flex flex-col items-center text-center"
               >
                 <div className="w-[56px] h-[56px] rounded-full border border-white/20 flex items-center justify-center mb-4">
                   <img
-                    src={card.icon}
-                    alt={card.title}
+                    src={iconMap[card.iconKey] || energyIcon}
+                    alt={card.utilityName}
                     className="w-6 h-6 object-contain"
                   />
                 </div>
 
                 <h3 className="text-white text-[19px] font-bold mb-2">
-                  {card.title}
+                  {card.utilityName}
                 </h3>
 
                 <p className="text-white/90 text-[12px] leading-5 max-w-[210px] mb-5">
-                  Initiate a new Data entry. Add required details & additional documents.
+                  {card.description || 'Initiate a new data entry.'}
                 </p>
 
                 <button
@@ -111,7 +105,8 @@ function FacilitySelectionPage() {
                         facility: selectedFacility,
                         site: selectedSite,
                         entry: selectedEntry,
-                        utility: card.title,
+                        utilityCode: card.utilityCode,
+                        utilityName: card.utilityName,
                       },
                     })
                   }

@@ -8,10 +8,13 @@ const siteRoutes = require('./routes/siteRoutes');
 const utilityRoutes = require('./routes/utilityRoutes');
 const formEntryRoutes = require('./routes/formEntryRoutes');
 const fileRoutes = require('./routes/fileRoutes');
+const authRoutes = require('./routes/authRoutes');
+const ulPureRoutes = require('./routes/ulPureRoutes');
+
 const errorHandler = require('./middleware/errorHandler');
 const db = require('./config/db');
 const { getContainerClient } = require('./config/blob');
-const authRoutes = require('./routes/authRoutes');
+
 const app = express();
 
 app.use(cors());
@@ -25,6 +28,7 @@ app.get('/', (req, res) => {
 app.get('/api/test-db', (req, res) => {
   try {
     const result = db.prepare("SELECT datetime('now') AS currentTime").get();
+
     res.json({
       message: 'Database connected successfully',
       data: result,
@@ -61,6 +65,7 @@ app.use('/api/utilities', utilityRoutes);
 app.use('/api/form-entries', formEntryRoutes);
 app.use('/api/files', fileRoutes);
 app.use('/api/auth', authRoutes);
+app.use('/api/ul-pure-entries', ulPureRoutes);
 
 app.use(errorHandler);
 

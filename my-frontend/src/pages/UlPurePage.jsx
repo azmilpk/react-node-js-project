@@ -8,92 +8,67 @@ function UlPurePage() {
 
   const selectedFacilityFromNav = location.state?.facility || '';
   const selectedSiteFromNav = location.state?.site || '';
+  const selectedEntryFromNav = location.state?.entry || '';
 
   const [tableData, setTableData] = useState([]);
   const [loading, setLoading] = useState(true);
-
   const [utilityFilter, setUtilityFilter] = useState('');
   const [monthFilter, setMonthFilter] = useState('');
   const [yearFilter, setYearFilter] = useState('');
 
   useEffect(() => {
-    fetchValidatedEntries();
+    fetchUlPureEntries();
   }, []);
 
-  const fetchValidatedEntries = async () => {
+  const fetchUlPureEntries = async () => {
     try {
       setLoading(true);
 
-      const response = await fetch(
-  'http://localhost:5000/api/form-entries'
-);
-      
+      const response = await fetch('http://localhost:5000/api/ul-pure-entries');
       const result = await response.json();
 
       if (!response.ok) {
-        throw new Error(result.message || 'Failed to fetch validated entries');
+        throw new Error(result.message || 'Failed to fetch UL Pure entries');
       }
 
-      const mappedData = result
-  .filter(
-    (item) =>
-      item.Status === 'Validated' ||
-      item.Status === 'Modified'
-  )
-  .map((item) => {
+      const mappedData = result.map((item) => {
+        const site = item.SiteCode || item.siteCode || '-';
         const facility =
+          selectedFacilityFromNav ||
           item.FacilityCode ||
           item.facilityCode ||
-          selectedFacilityFromNav ||
-          '';
-
-        const site =
-          item.SiteCode ||
-          item.siteCode ||
+          site ||
           '-';
 
         const entry =
           item.EntryName ||
           item.entryName ||
-          (facility && site !== '-' ? `${facility}-${site}` : site);
+          `${facility}-${site}`;
 
         return {
-  Id: item.Id,
-  id: item.Id,
-
-  entryNumber: item.EntryNumber || item.entryNumber,
-
-  facility,
-  site,
-  entry,
-
-  utility: item.UtilityCode || item.utilityCode || '-',
-
-  accountMeterNo:
-    item.AccountMeterNo || item.accountMeterNo || '-',
-
-  consumption:
-    item.Consumption || item.consumption || '-',
-
-  units:
-    item.Units || item.units || '-',
-
-  postingMonth:
-    item.PostingMonth || item.postingMonth || '-',
-
-  status:
-    item.Status || item.status || '-',
-
-  fileName:
-    item.FileName || item.fileName || 'No file uploaded',
-
-  fileUrl:
-    item.FileUrl || item.fileUrl || '',
-    comment: 
-    item.Comment || item.comment || '',
-};
+          Id: item.Id || item.id,
+          id: item.Id || item.id,
+          entryNumber: item.EntryNumber || item.entryNumber,
+          facility,
+          site,
+          entry,
+          utility:
+            item.UtilityName ||
+            item.utilityName ||
+            item.UtilityCode ||
+            item.utilityCode ||
+            '-',
+          accountMeterNo: item.AccountMeterNo || item.accountMeterNo || '-',
+          consumption: item.Consumption || item.consumption || '-',
+          units: item.Units || item.units || '-',
+          postingMonth: item.PostingMonth || item.postingMonth || '-',
+          status: item.Status || item.status || 'Validate',
+          fileName: item.FileName || item.fileName || 'No file uploaded',
+          fileUrl: item.FileUrl || item.fileUrl || '',
+          comment: item.Comment || item.comment || '',
+        };
       });
-console.log(mappedData);
+
       setTableData(mappedData);
     } catch (error) {
       console.error('UL Pure fetch error:', error.message);
@@ -106,20 +81,31 @@ console.log(mappedData);
     return tableData.filter((row) => {
       const [year, month] = (row.postingMonth || '').split('-');
 
-      const matchSite = !selectedSiteFromNav || row.site === selectedSiteFromNav;
+      const normalizedSelectedSite = (selectedSiteFromNav || '').trim().toLowerCase();
+      const rowSite = (row.site || '').trim().toLowerCase();
+
+      const matchSite =
+        !selectedSiteFromNav || rowSite === normalizedSelectedSite;
+
       const matchUtility = !utilityFilter || row.utility === utilityFilter;
       const matchMonth = !monthFilter || month === monthFilter;
       const matchYear = !yearFilter || year === yearFilter;
 
       return matchSite && matchUtility && matchMonth && matchYear;
     });
-  }, [tableData, selectedSiteFromNav, utilityFilter, monthFilter, yearFilter]);
+  }, [
+    tableData,
+    selectedSiteFromNav,
+    utilityFilter,
+    monthFilter,
+    yearFilter,
+  ]);
 
-  const utilityOptions = [...new Set(tableData.map((row) => row.utility).filter(Boolean))];
+  const utilityOptions = [...new Set(filteredData.map((row) => row.utility).filter(Boolean))];
 
   const yearOptions = [
     ...new Set(
-      tableData
+      filteredData
         .map((row) => (row.postingMonth || '').split('-')[0])
         .filter(Boolean)
     ),
@@ -133,6 +119,9 @@ console.log(mappedData);
     navigate('/ul-pure-details', {
       state: {
         selectedEntry: row,
+        selectedSite: selectedSiteFromNav,
+        selectedFacility: selectedFacilityFromNav,
+        selectedEntryLabel: selectedEntryFromNav,
       },
     });
   };
@@ -151,7 +140,7 @@ console.log(mappedData);
         <section className="w-full max-w-[1450px] mx-auto">
           <div className="flex items-center justify-between mb-6">
             <h1 className="text-[28px] sm:text-[36px] lg:text-[44px] xl:text-[48px] leading-tight font-bold text-black">
-              UL PURE DATA
+              UL PURE DATA - {selectedEntryFromNav || selectedSiteFromNav || 'All Facilities'}
             </h1>
 
             <button
@@ -277,14 +266,20 @@ console.log(mappedData);
                         <td className="px-4 py-4 text-[13px] text-black">{row.entryNumber}</td>
                         <td className="px-4 py-4 text-[13px] text-black">{row.postingMonth}</td>
                         <td className="px-4 py-4">
-                          <button
-                            type="button"
-                            onClick={() => handleViewDetails(row)}
-                            className="h-[34px] px-4 rounded-full bg-green-600 text-white text-[12px] font-semibold hover:bg-green-700 transition duration-300"
-                          >
-                            Validated
-                          </button>
-                        </td>
+ <button
+  type="button"
+  onClick={() => handleViewDetails(row)}
+  className={`h-[34px] px-4 rounded-full text-white text-[12px] font-semibold transition duration-300 ${
+    row.status === 'Validated'
+      ? 'bg-green-600 hover:bg-green-700'
+      : 'bg-sky-500 hover:bg-sky-600'
+  }`}
+>
+  {row.status === 'Validated'
+    ? 'Validated'
+    : 'Validate'}
+</button>
+</td>
                       </tr>
                     ))
                   ) : (

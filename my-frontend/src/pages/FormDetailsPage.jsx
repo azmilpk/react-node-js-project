@@ -1,166 +1,122 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import TopNavbar from '../components/topnavbar/TopNavbar';
+import { formConfigBySiteUtility } from '../config/formConfig';
 
 function FormDetailsPage() {
-  const getCurrentMonth = () => {
-    const today = new Date();
-    const year = today.getFullYear();
-    const month = String(today.getMonth() + 1).padStart(2, '0');
-    return `${year}-${month}`;
-  };
-
   const navigate = useNavigate();
   const location = useLocation();
 
   const selectedFacility = location.state?.facility || '';
-  const selectedSite = location.state?.site || 'KOP';
-  const selectedUtility = location.state?.utility || 'WATER';
+  const selectedSite = location.state?.site || '';
+  const selectedUtilityCode = location.state?.utilityCode || '';
+  const selectedUtilityName = location.state?.utilityName || '';
+
   const selectedEntry =
     location.state?.entry ||
     (selectedFacility && selectedSite
       ? `${selectedFacility}-${selectedSite}`
-      : selectedSite);
+      : selectedSite || selectedFacility);
 
   const formConfig = useMemo(() => {
-    const configs = {
-      WATER: {
-        fixedFields: [
-          { label: 'Facility', value: selectedEntry },
-          { label: 'Posting Date Month', value: getCurrentMonth() },
-          { label: 'Utility', value: 'WATER' },
-          { label: 'Account Number / Meter No', value: '12812696' },
-          { label: 'Units', value: 'm3' },
-        ],
-        editableFields: [
-          {
-            name: 'consumption',
-            label: 'Consumption',
-            placeholder: 'Enter water consumption',
-          },
-          { name: 'attachments', label: 'Attachments', type: 'file' },
-        ],
-      },
-      WASTE: {
-        fixedFields: [
-          { label: 'Facility', value: selectedEntry },
-          { label: 'Posting Date Month', value: getCurrentMonth() },
-          { label: 'Utility', value: 'WASTE' },
-          { label: 'Waste Category', value: 'General Waste' },
-          { label: 'Units', value: 'kg' },
-        ],
-        editableFields: [
-          {
-            name: 'quantity',
-            label: 'Quantity',
-            placeholder: 'Enter waste quantity',
-          },
-          { name: 'attachments', label: 'Attachments', type: 'file' },
-        ],
-      },
-      'Energy Consumption': {
-        fixedFields: [
-          { label: 'Facility', value: selectedEntry },
-          { label: 'Posting Date Month', value: getCurrentMonth() },
-          { label: 'Utility', value: 'Energy Consumption' },
-          { label: 'Account Number / Meter No', value: 'DEFAULT-001' },
-          { label: 'Units', value: 'unit' },
-        ],
-        editableFields: [
-          {
-            name: 'consumption',
-            label: 'Consumption',
-            placeholder: 'Enter energy consumption',
-          },
-          { name: 'attachments', label: 'Attachments', type: 'file' },
-        ],
-      },
-      'Fuel Consumption': {
-        fixedFields: [
-          { label: 'Facility', value: selectedEntry },
-          { label: 'Posting Date Month', value: getCurrentMonth() },
-          { label: 'Utility', value: 'Fuel Consumption' },
-          { label: 'Account Number / Meter No', value: 'DEFAULT-001' },
-          { label: 'Units', value: 'litres' },
-        ],
-        editableFields: [
-          {
-            name: 'consumption',
-            label: 'Consumption',
-            placeholder: 'Enter fuel consumption',
-          },
-          { name: 'attachments', label: 'Attachments', type: 'file' },
-        ],
-      },
-      'Produced Units': {
-        fixedFields: [
-          { label: 'Facility', value: selectedEntry },
-          { label: 'Posting Date Month', value: getCurrentMonth() },
-          { label: 'Utility', value: 'Produced Units' },
-          { label: 'Account Number / Meter No', value: 'DEFAULT-001' },
-          { label: 'Units', value: 'unit' },
-        ],
-        editableFields: [
-          {
-            name: 'producedQuantity',
-            label: 'Produced Quantity',
-            placeholder: 'Enter produced quantity',
-          },
-          { name: 'attachments', label: 'Attachments', type: 'file' },
-        ],
-      },
-      Diesel: {
-        fixedFields: [
-          { label: 'Facility', value: selectedEntry },
-          { label: 'Posting Date Month', value: getCurrentMonth() },
-          { label: 'Utility', value: 'Diesel' },
-          { label: 'Account Number / Meter No', value: 'DEFAULT-001' },
-          { label: 'Units', value: 'litres' },
-        ],
-        editableFields: [
-          {
-            name: 'consumption',
-            label: 'Consumption',
-            placeholder: 'Enter diesel consumption',
-          },
-          { name: 'attachments', label: 'Attachments', type: 'file' },
-        ],
-      },
-    };
-
-    return configs[selectedUtility] || {
-      fixedFields: [
-        { label: 'Facility', value: selectedEntry },
-        { label: 'Posting Date Month', value: getCurrentMonth() },
-        { label: 'Utility', value: selectedUtility },
-        { label: 'Account Number / Meter No', value: 'DEFAULT-001' },
-        { label: 'Units', value: 'unit' },
-      ],
-      editableFields: [
-        {
-          name: 'consumption',
-          label: 'Consumption',
-          placeholder: 'Enter value',
-        },
-        { name: 'attachments', label: 'Attachments', type: 'file' },
-      ],
-    };
-  }, [selectedEntry, selectedUtility]);
+    return (
+      formConfigBySiteUtility[selectedSite]?.[selectedUtilityCode] ||
+      formConfigBySiteUtility[selectedFacility]?.[selectedUtilityCode] ||
+      null
+    );
+  }, [selectedSite, selectedFacility, selectedUtilityCode]);
 
   const [formValues, setFormValues] = useState({});
   const [selectedFile, setSelectedFile] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [message, setMessage] = useState('');
 
+  useEffect(() => {
+    if (!formConfig) return;
+
+    const initialValues = {};
+
+    (formConfig.editableFields || []).forEach((field) => {
+      if (field.defaultValue !== undefined) {
+        initialValues[field.name] =
+          field.name === 'facility' && !field.defaultValue
+            ? selectedEntry
+            : field.defaultValue;
+      } else if (field.name === 'facility') {
+        initialValues[field.name] = selectedEntry;
+      }
+    });
+
+    setFormValues(initialValues);
+  }, [formConfig, selectedEntry]);
+
+  const monthToNumber = (monthName) => {
+    const monthsMap = {
+      January: '01',
+      February: '02',
+      March: '03',
+      April: '04',
+      May: '05',
+      June: '06',
+      July: '07',
+      August: '08',
+      September: '09',
+      October: '10',
+      November: '11',
+      December: '12',
+    };
+
+    return monthsMap[monthName] || '01';
+  };
+
   const handleChange = (name, value) => {
-    setFormValues((prev) => ({
-      ...prev,
-      [name]: value,
-    }));
+    setFormValues((prev) => {
+      const updated = {
+        ...prev,
+        [name]: value,
+      };
+
+      if (name === 'reportingMonth' && prev.postingMonth) {
+        const currentPosting = prev.postingMonth || '2026-01';
+        const year = currentPosting.split('-')[0] || '2026';
+        updated.postingMonth = `${year}-${monthToNumber(value)}`;
+      }
+
+      return updated;
+    });
+
+    setMessage('');
+  };
+
+  const validateForm = () => {
+    const editableFields = formConfig?.editableFields || [];
+
+    for (const field of editableFields) {
+      if (field.required && field.type !== 'file') {
+        const value = formValues[field.name];
+        if (value === undefined || value === null || value === '') {
+          return `${field.label} is required`;
+        }
+      }
+    }
+
+    return '';
   };
 
   const handleSubmit = async () => {
     try {
+      if (!formConfig) {
+        setMessage('No form configuration found');
+        return;
+      }
+
+      const validationError = validateForm();
+
+      if (validationError) {
+        setMessage(validationError);
+        return;
+      }
+
       setIsSubmitting(true);
       setMessage('');
 
@@ -194,12 +150,14 @@ function FormDetailsPage() {
         facilityCode: selectedFacility,
         siteCode: selectedSite,
         entryName: selectedEntry,
-        utilityCode: selectedUtility,
-        postingMonth: formConfig.fixedFields[1]?.value || '',
-        accountMeterNo: formConfig.fixedFields[3]?.value || '',
-        units: formConfig.fixedFields[4]?.value || '',
+        utilityCode: selectedUtilityCode,
+        utilityName: formValues.utility || selectedUtilityName,
+        postingMonth: formValues.postingMonth || '',
+        accountMeterNo: formValues.accountMeterNo || '',
+        units: formValues.units || '',
         consumption:
           formValues.consumption ||
+          formValues.meterReading ||
           formValues.quantity ||
           formValues.producedQuantity ||
           '',
@@ -257,41 +215,18 @@ function FormDetailsPage() {
             </p>
           </div>
 
-          <div className="bg-white rounded-[22px] p-5 sm:p-6 shadow-md">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-              <div className="space-y-4">
-                {formConfig.fixedFields.slice(0, 3).map((field) => (
-                  <div key={field.label}>
-                    <label className="block text-[13px] font-semibold text-black mb-2">
-                      {field.label}
-                    </label>
-                    <input
-                      type="text"
-                      value={field.value}
-                      readOnly
-                      className="w-full h-[42px] px-4 rounded-[12px] border border-black/20 bg-[#f3f3f3] text-[13px] text-black outline-none"
-                    />
-                  </div>
-                ))}
-              </div>
-
-              <div className="space-y-4">
-                {formConfig.fixedFields.slice(3).map((field) => (
-                  <div key={field.label}>
-                    <label className="block text-[13px] font-semibold text-black mb-2">
-                      {field.label}
-                    </label>
-                    <input
-                      type="text"
-                      value={field.value}
-                      readOnly
-                      className="w-full h-[42px] px-4 rounded-[12px] border border-black/20 bg-[#f3f3f3] text-[13px] text-black outline-none"
-                    />
-                  </div>
-                ))}
-
-                {formConfig.editableFields.map((field) => (
-                  <div key={field.name}>
+          {!formConfig ? (
+            <div className="bg-white rounded-[22px] p-5 sm:p-6 shadow-md text-center">
+              No form configuration found for {selectedSite} / {selectedUtilityName || selectedUtilityCode}.
+            </div>
+          ) : (
+            <div className="bg-white rounded-[22px] p-5 sm:p-6 shadow-md">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                {formConfig.editableFields?.map((field) => (
+                  <div
+                    key={field.name}
+                    className={field.type === 'file' ? 'md:col-span-2' : ''}
+                  >
                     <label className="block text-[13px] font-semibold text-black mb-2">
                       {field.label}
                     </label>
@@ -329,45 +264,58 @@ function FormDetailsPage() {
                           {selectedFile ? selectedFile.name : 'No file selected'}
                         </div>
                       </div>
-                    ) : (
-                      <input
-                        type="text"
+                    ) : field.type === 'select' ? (
+                      <select
                         value={formValues[field.name] || ''}
                         onChange={(e) => handleChange(field.name, e.target.value)}
-                        placeholder={field.placeholder}
+                        className="w-full h-[42px] px-4 rounded-[12px] border border-black/20 bg-white text-[13px] text-black outline-none"
+                      >
+                        <option value="">Select {field.label}</option>
+                        {(field.options || []).map((option) => (
+                          <option key={option} value={option}>
+                            {option}
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      <input
+                        type={field.type || 'text'}
+                        value={formValues[field.name] || ''}
+                        onChange={(e) => handleChange(field.name, e.target.value)}
+                        placeholder={field.placeholder || ''}
                         className="w-full h-[42px] px-4 rounded-[12px] border border-black/20 bg-white text-[13px] text-black outline-none"
                       />
                     )}
                   </div>
                 ))}
               </div>
-            </div>
 
-            {message && (
-              <div className="mt-4 text-center text-sm font-medium text-black">
-                {message}
+              {message && (
+                <div className="mt-4 text-center text-sm font-medium text-black">
+                  {message}
+                </div>
+              )}
+
+              <div className="flex justify-center gap-4 mt-8">
+                <button
+                  type="button"
+                  onClick={() => navigate(-1)}
+                  className="min-w-[130px] h-[42px] px-5 rounded-full bg-black text-white text-[13px] font-semibold hover:bg-neutral-800 transition duration-300"
+                >
+                  Back
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleSubmit}
+                  disabled={isSubmitting}
+                  className="min-w-[130px] h-[42px] px-5 rounded-full bg-black text-white text-[13px] font-semibold hover:bg-neutral-800 transition duration-300 disabled:opacity-60"
+                >
+                  {isSubmitting ? 'Submitting...' : 'Submit'}
+                </button>
               </div>
-            )}
-
-            <div className="flex justify-center gap-4 mt-8">
-              <button
-                type="button"
-                onClick={() => navigate(-1)}
-                className="min-w-[130px] h-[42px] px-5 rounded-full bg-black text-white text-[13px] font-semibold hover:bg-neutral-800 transition duration-300"
-              >
-                Back
-              </button>
-
-              <button
-                type="button"
-                onClick={handleSubmit}
-                disabled={isSubmitting}
-                className="min-w-[130px] h-[42px] px-5 rounded-full bg-black text-white text-[13px] font-semibold hover:bg-neutral-800 transition duration-300 disabled:opacity-60"
-              >
-                {isSubmitting ? 'Submitting...' : 'Submit'}
-              </button>
             </div>
-          </div>
+          )}
         </section>
       </main>
     </div>

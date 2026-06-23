@@ -8,8 +8,9 @@ import checkData2Icon from '../assets/siteownervectors/checkdata2.svg';
 
 const siteOptions = {
   'Köping': ['Köping'],
-  LVO: ['LVLC', 'MEC', 'RT100', 'Macungie'],
-  NRV: ['NRV'],
+  'NRV': ['NRV'],
+  'LVO': ['LVLC', 'MEC', 'RT100', 'Macungie'],
+
 };
 
 function SiteOwnerPage() {

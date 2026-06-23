@@ -8,8 +8,11 @@ const insertFormEntry = (data) => {
     INSERT INTO FormEntries
     (
       EntryNumber,
+      FacilityCode,
       SiteCode,
+      EntryName,
       UtilityCode,
+      UtilityName,
       PostingMonth,
       AccountMeterNo,
       Units,
@@ -19,13 +22,17 @@ const insertFormEntry = (data) => {
       FileName,
       FileUrl,
       PdfUrl,
-      Comment
+      Comment,
+      FormValuesJson
     )
     VALUES
     (
       @entryNumber,
+      @facilityCode,
       @siteCode,
+      @entryName,
       @utilityCode,
+      @utilityName,
       @postingMonth,
       @accountMeterNo,
       @units,
@@ -35,14 +42,18 @@ const insertFormEntry = (data) => {
       @fileName,
       @fileUrl,
       @pdfUrl,
-      @comment
+      @comment,
+      @formValuesJson
     )
   `);
 
   const result = stmt.run({
     entryNumber,
+    facilityCode: data.facilityCode || '',
     siteCode: data.siteCode || '',
+    entryName: data.entryName || '',
     utilityCode: data.utilityCode || '',
+    utilityName: data.utilityName || data.utilityCode || '',
     postingMonth: data.postingMonth || '',
     accountMeterNo: data.accountMeterNo || '',
     units: data.units || '',
@@ -53,17 +64,21 @@ const insertFormEntry = (data) => {
     fileUrl: data.fileUrl || '',
     pdfUrl: data.pdfUrl || '',
     comment: data.comment || '',
+    formValuesJson: data.formValuesJson || null,
   });
 
-  return db
-    .prepare('SELECT * FROM FormEntries WHERE Id = ?')
-    .get(result.lastInsertRowid);
+  return db.prepare('SELECT * FROM FormEntries WHERE Id = ?').get(result.lastInsertRowid);
 };
 
 // Get All Entries
 const fetchFormEntries = (query) => {
   let sql = 'SELECT * FROM FormEntries WHERE 1=1';
   const params = [];
+
+  if (query.facilityCode) {
+    sql += ' AND FacilityCode = ?';
+    params.push(query.facilityCode);
+  }
 
   if (query.siteCode) {
     sql += ' AND SiteCode = ?';
@@ -90,61 +105,53 @@ const fetchFormEntryById = (id) => {
 
 // Change Status
 const changeFormEntryStatus = (id, status) => {
-  const entry = db
-    .prepare('SELECT * FROM FormEntries WHERE Id = ?')
-    .get(id);
+  const entry = db.prepare('SELECT * FROM FormEntries WHERE Id = ?').get(id);
 
   if (!entry) {
     throw new Error('Entry not found');
+  }
+
+  let finalStatus = status;
+
+  if (status === 'Validated' && entry.Status === 'Modified') {
+    finalStatus = 'Modified and Validated';
   }
 
   db.prepare(`
     UPDATE FormEntries
     SET Status = ?
     WHERE Id = ?
-  `).run(status, id);
+  `).run(finalStatus, id);
 
-  return db
-    .prepare('SELECT * FROM FormEntries WHERE Id = ?')
-    .get(id);
+  return db.prepare('SELECT * FROM FormEntries WHERE Id = ?').get(id);
 };
 
-// Update Entry From UL Pure Details
+// Update Entry
 const updateFormEntry = (id, data) => {
-  console.log('==============================');
-  console.log('UPDATE REQUEST RECEIVED');
-  console.log('ID =', id);
-  console.log('DATA =', data);
-
-  const entry = db
-    .prepare('SELECT * FROM FormEntries WHERE Id = ?')
-    .get(id);
-
-  console.log('FOUND ENTRY =', entry);
+  const entry = db.prepare('SELECT * FROM FormEntries WHERE Id = ?').get(id);
 
   if (!entry) {
     throw new Error('Entry not found');
   }
 
-  db.prepare(`
-    UPDATE FormEntries
-    SET
-      PostingMonth = ?,
-      Consumption = ?,
-      Comment = ?,
-      Status = ?
-    WHERE Id = ?
-  `).run(
-    data.postingMonth || entry.PostingMonth,
-    data.consumption || entry.Consumption,
-    data.comment || entry.Comment || '',
-    'Modified',
-    id
-  );
+db.prepare(`
+UPDATE FormEntries
+SET
+  PostingMonth = ?,
+  Consumption = ?,
+  Comment = ?,
+  Status = ?,
+  CreatedAt = datetime('now')
+WHERE Id = ?
+`).run(
+  data.postingMonth || entry.PostingMonth,
+  data.consumption || entry.Consumption,
+  data.comment || entry.Comment || '',
+  'Modified and Validated',
+  id
+);
 
-  return db
-    .prepare('SELECT * FROM FormEntries WHERE Id = ?')
-    .get(id);
+  return db.prepare('SELECT * FROM FormEntries WHERE Id = ?').get(id);
 };
 
 module.exports = {

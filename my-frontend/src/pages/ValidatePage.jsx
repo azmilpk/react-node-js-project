@@ -7,12 +7,12 @@ function ValidatePage() {
   const location = useLocation();
 
   const selectedFacility = location.state?.facility || '';
-  const selectedSite = location.state?.site || 'All Facilities';
+  const selectedSite = location.state?.site || '';
   const selectedEntry =
     location.state?.entry ||
     (selectedFacility && selectedSite
       ? `${selectedFacility}-${selectedSite}`
-      : selectedSite);
+      : selectedSite || selectedFacility || 'All Facilities');
 
   const [tableData, setTableData] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -39,19 +39,41 @@ function ValidatePage() {
         throw new Error(result.message || 'Failed to fetch entries');
       }
 
-      const mappedData = result.map((item) => ({
-        id: item.Id || item.id,
-        entryNumber: item.EntryNumber || item.entryNumber,
-        utility: item.UtilityCode || item.utilityCode || '-',
-        facility: item.SiteCode || item.siteCode || '-',
-        accountMeterNo: item.AccountMeterNo || item.accountMeterNo || '-',
-        consumption: item.Consumption || item.consumption || '-',
-        units: item.Units || item.units || '-',
-        recordDate: item.PostingMonth || item.postingMonth || '-',
-        status: item.Status || item.status || 'Pending',
-        fileName: item.FileName || item.fileName || 'No file uploaded',
-        fileUrl: item.FileUrl || item.fileUrl || '',
-      }));
+      const mappedData = result.map((item) => {
+        const siteCode = item.SiteCode || item.siteCode || '';
+        const facilityCode =
+          item.FacilityCode ||
+          item.facilityCode ||
+          selectedFacility ||
+          '';
+
+        return {
+          Id: item.Id || item.id,
+          id: item.Id || item.id,
+          entryNumber: item.EntryNumber || item.entryNumber,
+          utility:
+            item.UtilityName ||
+            item.utilityName ||
+            item.UtilityCode ||
+            item.utilityCode ||
+            '-',
+          utilityCode: item.UtilityCode || item.utilityCode || '',
+          facility: facilityCode || siteCode || '-',
+          site: siteCode || '-',
+          facilityCode,
+          siteCode,
+          accountMeterNo: item.AccountMeterNo || item.accountMeterNo || '-',
+          consumption: item.Consumption || item.consumption || '-',
+          units: item.Units || item.units || '-',
+          recordDate: item.PostingMonth || item.postingMonth || '-',
+          postingMonth: item.PostingMonth || item.postingMonth || '-',
+          status: item.Status || item.status || 'Pending',
+          fileName: item.FileName || item.fileName || 'No file uploaded',
+          fileUrl: item.FileUrl || item.fileUrl || '',
+          comment: item.Comment || item.comment || '',
+          entry: item.EntryName || item.entryName || '',
+        };
+      });
 
       setTableData(mappedData);
     } catch (error) {
@@ -65,8 +87,11 @@ function ValidatePage() {
     return tableData.filter((row) => {
       const [year, month] = (row.recordDate || '').split('-');
 
+      const normalizedSelectedSite = (selectedSite || '').trim().toLowerCase();
+      const rowSite = (row.site || '').trim().toLowerCase();
+
       const matchSite =
-        selectedSite === 'All Facilities' || row.facility === selectedSite;
+        !selectedSite || rowSite === normalizedSelectedSite;
 
       const matchUtility = !utilityFilter || row.utility === utilityFilter;
       const matchMonth = !monthFilter || month === monthFilter;
@@ -120,15 +145,34 @@ function ValidatePage() {
           item.id === row.id
             ? {
                 ...item,
-                status: 'Validated',
+                status: result.Status || 'Validated',
               }
             : item
         )
       );
     } catch (error) {
       console.error('Validate error:', error.message);
+      alert(error.message || 'Failed to validate entry');
     }
   };
+
+ const handleOpenValidateDetails = (row) => {
+  if (
+    row.status !== 'Validated' &&
+    row.status !== 'Modified and Validated'
+  ) {
+    return;
+  }
+
+  navigate('/validate-details', {
+    state: {
+      selectedEntry: row,
+      selectedSite,
+      selectedFacility,
+      selectedEntryLabel: selectedEntry,
+    },
+  });
+};
 
   const getFileType = (url = '', name = '') => {
     const value = `${url} ${name}`.toLowerCase();
@@ -150,15 +194,30 @@ function ValidatePage() {
     return 'unknown';
   };
 
+  const isExcelFile = (url = '', name = '') => {
+    const value = `${url} ${name}`.toLowerCase();
+
+    return (
+      value.includes('.xlsx') ||
+      value.includes('.xls') ||
+      value.includes('.csv')
+    );
+  };
+
   const handleDownload = (row) => {
     if (!row.fileUrl) {
-      alert('No file available for preview');
+      alert('No file available');
       return;
     }
 
     const previewUrl = `http://localhost:5000/api/files/view?blobUrl=${encodeURIComponent(
       row.fileUrl
     )}`;
+
+    if (isExcelFile(row.fileUrl, row.fileName)) {
+      window.open(previewUrl, '_blank', 'noopener,noreferrer');
+      return;
+    }
 
     setPreviewFile({
       ...row,
@@ -172,7 +231,41 @@ function ValidatePage() {
     setPreviewFile(null);
   };
 
-  const utilityOptions = [...new Set(tableData.map((row) => row.utility).filter(Boolean))];
+  const handleGenerateUlPure = async () => {
+    try {
+      const response = await fetch('http://localhost:5000/api/ul-pure-entries/generate', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          site: selectedSite,
+          status: 'Modified and Validated',
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.message || 'Failed to generate UL Pure data');
+      }
+
+      alert(result.message || 'Modified and Validated entries moved successfully');
+
+      navigate('/ul-pure', {
+        state: {
+          facility: selectedFacility,
+          site: selectedSite,
+          entry: selectedEntry,
+        },
+      });
+    } catch (error) {
+      console.error('Generate UL Pure error:', error.message);
+      alert(error.message || 'Failed to generate UL Pure data');
+    }
+  };
+
+  const utilityOptions = [...new Set(filteredData.map((row) => row.utility).filter(Boolean))];
 
   return (
     <div className="w-full h-screen bg-[#f5f5f5] flex flex-col overflow-hidden">
@@ -182,7 +275,7 @@ function ValidatePage() {
         <section className="w-full max-w-[1450px] mx-auto">
           <div className="flex items-center justify-between mb-6">
             <h1 className="text-[28px] sm:text-[36px] lg:text-[44px] xl:text-[48px] leading-tight font-bold text-black">
-              Validate Data - {selectedEntry}
+              Validate Data - {selectedEntry || selectedSite || 'All Facilities'}
             </h1>
 
             <button
@@ -266,6 +359,7 @@ function ValidatePage() {
                 >
                   <option value="Pending">Pending</option>
                   <option value="Validated">Validated</option>
+                  <option value="Modified and Validated">Modified and Validated</option>
                   <option value="Rejected">Rejected</option>
                 </select>
               </div>
@@ -317,24 +411,32 @@ function ValidatePage() {
                         <td className="px-4 py-4 text-[13px] text-black">{row.recordDate}</td>
 
                         <td className="px-4 py-4">
-                          <span
-                            className={`inline-flex items-center justify-center min-w-[90px] h-[32px] px-3 rounded-full text-[12px] font-semibold ${
+                          <button
+                            type="button"
+                            onClick={() => handleOpenValidateDetails(row)}
+                            disabled={row.status !== 'Validated' && row.status !== 'Modified and Validated'}
+                            className={`inline-flex items-center justify-center min-w-[90px] h-[32px] px-3 rounded-full text-[12px] font-semibold transition duration-300 ${
                               row.status === 'Validated'
-                                ? 'bg-green-600 text-white'
+                                ? 'bg-green-600 text-white hover:bg-green-700 cursor-pointer'
+                                : row.status === 'Modified and Validated'
+                                ? 'bg-gray-600 text-white cursor-default'
                                 : row.status === 'Rejected'
-                                ? 'bg-red-500 text-white'
-                                : 'bg-[#f4b400] text-black'
+                                ? 'bg-red-500 text-white cursor-default'
+                                : 'bg-[#f4b400] text-black cursor-default'
                             }`}
                           >
                             {row.status}
-                          </span>
+                          </button>
                         </td>
 
                         <td className="px-4 py-4">
                           <button
                             type="button"
                             onClick={() => handleValidate(row)}
-                            disabled={row.status === 'Validated'}
+                            disabled={
+                              row.status === 'Validated' ||
+                              row.status === 'Modified and Validated'
+                            }
                             className="h-[34px] px-4 rounded-full bg-[#0078d4] text-white text-[12px] font-semibold hover:bg-[#0062ad] transition duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
                           >
                             Validate
@@ -370,15 +472,7 @@ function ValidatePage() {
 
               <button
                 type="button"
-                onClick={() =>
-                  navigate('/ul-pure', {
-                    state: {
-                      facility: selectedFacility,
-                      site: selectedSite,
-                      entry: selectedEntry,
-                    },
-                  })
-                }
+                onClick={handleGenerateUlPure}
                 className="h-[40px] px-5 rounded-full bg-black text-white text-[13px] font-semibold hover:bg-neutral-800 transition duration-300 self-start sm:self-auto"
               >
                 Generate ULpure Data
@@ -442,4 +536,4 @@ function ValidatePage() {
   );
 }
 
-export default ValidatePage;
+export default ValidatePage;        
