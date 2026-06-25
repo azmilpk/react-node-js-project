@@ -9,6 +9,8 @@ import ValidateDetailsPage from './pages/ValidateDetailsPage';
 import UlPureDetailsPage from './pages/UlPureDetailsPage';
 import UlPurePage from './pages/UlPurePage';
 import ProfilePage from './pages/ProfilePage';
+import AuditorUlPurePage from './pages/AuditorUlPurePage';
+import AuditorValidatePage from './pages/AuditorValidatePage';
 
 function App() {
   return (
@@ -23,6 +25,8 @@ function App() {
         <Route path="/validate-details" element={<ValidateDetailsPage />} />
         <Route path="/ul-pure-details" element={<UlPureDetailsPage />} />
         <Route path="/ul-pure" element={<UlPurePage />} />
+        <Route path="/auditor-ul-pure" element={<AuditorUlPurePage />} />
+        <Route path="/auditor-validate-data" element={<AuditorValidatePage />} />
         <Route path="/profile" element={<ProfilePage />} />
       </Routes>
     </BrowserRouter>

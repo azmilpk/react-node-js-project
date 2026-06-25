@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import TopNavbar from '../components/topnavbar/TopNavbar';
+import HistoryPanel from '../components/HistoryPanel';
+import { getCurrentUserName, getCurrentUserRole } from '../utils/currentUser';
 
 function ValidatePage() {
   const navigate = useNavigate();
@@ -23,6 +25,11 @@ function ValidatePage() {
 
   const [previewFile, setPreviewFile] = useState(null);
   const [previewOpen, setPreviewOpen] = useState(false);
+
+  const [historyRow, setHistoryRow] = useState(null);
+
+  const userRole = getCurrentUserRole();
+  const isAuditor = userRole === 'Auditor';
 
   useEffect(() => {
     fetchEntries();
@@ -130,6 +137,7 @@ function ValidatePage() {
           },
           body: JSON.stringify({
             status: 'Validated',
+            changedBy: getCurrentUserName(),
           }),
         }
       );
@@ -156,23 +164,23 @@ function ValidatePage() {
     }
   };
 
- const handleOpenValidateDetails = (row) => {
-  if (
-    row.status !== 'Validated' &&
-    row.status !== 'Modified and Validated'
-  ) {
-    return;
-  }
+  const handleOpenValidateDetails = (row) => {
+    if (
+      row.status !== 'Validated' &&
+      row.status !== 'Modified and Validated'
+    ) {
+      return;
+    }
 
-  navigate('/validate-details', {
-    state: {
-      selectedEntry: row,
-      selectedSite,
-      selectedFacility,
-      selectedEntryLabel: selectedEntry,
-    },
-  });
-};
+    navigate('/validate-details', {
+      state: {
+        selectedEntry: row,
+        selectedSite,
+        selectedFacility,
+        selectedEntryLabel: selectedEntry,
+      },
+    });
+  };
 
   const getFileType = (url = '', name = '') => {
     const value = `${url} ${name}`.toLowerCase();
@@ -241,6 +249,7 @@ function ValidatePage() {
         body: JSON.stringify({
           site: selectedSite,
           status: 'Modified and Validated',
+          changedBy: getCurrentUserName(),
         }),
       });
 
@@ -388,7 +397,9 @@ function ValidatePage() {
                     <th className="px-4 py-3 text-left text-[13px] font-semibold">Units</th>
                     <th className="px-4 py-3 text-left text-[13px] font-semibold">Record Date</th>
                     <th className="px-4 py-3 text-left text-[13px] font-semibold">Check Status</th>
-                    <th className="px-4 py-3 text-left text-[13px] font-semibold">Validate Data</th>
+                    <th className="px-4 py-3 text-left text-[13px] font-semibold">
+                      {isAuditor ? 'History' : 'Validate Data'}
+                    </th>
                     <th className="px-4 py-3 text-left text-[13px] font-semibold">Download File</th>
                   </tr>
                 </thead>
@@ -430,17 +441,27 @@ function ValidatePage() {
                         </td>
 
                         <td className="px-4 py-4">
-                          <button
-                            type="button"
-                            onClick={() => handleValidate(row)}
-                            disabled={
-                              row.status === 'Validated' ||
-                              row.status === 'Modified and Validated'
-                            }
-                            className="h-[34px] px-4 rounded-full bg-[#0078d4] text-white text-[12px] font-semibold hover:bg-[#0062ad] transition duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
-                          >
-                            Validate
-                          </button>
+                          {isAuditor ? (
+                            <button
+                              type="button"
+                              onClick={() => setHistoryRow(row)}
+                              className="h-[34px] px-4 rounded-full border border-black/20 text-black text-[12px] font-semibold hover:bg-black hover:text-white transition duration-300"
+                            >
+                              History
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => handleValidate(row)}
+                              disabled={
+                                row.status === 'Validated' ||
+                                row.status === 'Modified and Validated'
+                              }
+                              className="h-[34px] px-4 rounded-full bg-[#0078d4] text-white text-[12px] font-semibold hover:bg-[#0062ad] transition duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                              Validate
+                            </button>
+                          )}
                         </td>
 
                         <td className="px-4 py-4">
@@ -470,13 +491,15 @@ function ValidatePage() {
                 Total Consumption : {totalConsumption}
               </div>
 
-              <button
-                type="button"
-                onClick={handleGenerateUlPure}
-                className="h-[40px] px-5 rounded-full bg-black text-white text-[13px] font-semibold hover:bg-neutral-800 transition duration-300 self-start sm:self-auto"
-              >
-                Generate ULpure Data
-              </button>
+              {!isAuditor && (
+                <button
+                  type="button"
+                  onClick={handleGenerateUlPure}
+                  className="h-[40px] px-5 rounded-full bg-black text-white text-[13px] font-semibold hover:bg-neutral-800 transition duration-300 self-start sm:self-auto"
+                >
+                  Generate ULpure Data
+                </button>
+              )}
             </div>
           </div>
         </section>
@@ -532,8 +555,35 @@ function ValidatePage() {
           </div>
         </div>
       )}
+
+      {historyRow && (
+        <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4">
+          <div className="w-full max-w-3xl bg-white rounded-[20px] shadow-xl overflow-hidden">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-black/10">
+              <div>
+                <h2 className="text-[18px] font-bold text-black">Change History</h2>
+                <p className="text-[13px] text-black/60">
+                  {historyRow.utility} — {historyRow.facility}
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setHistoryRow(null)}
+                className="min-w-[100px] h-[38px] px-4 rounded-full bg-black text-white text-[12px] font-semibold hover:bg-neutral-800 transition duration-300"
+              >
+                Close
+              </button>
+            </div>
+
+            <div className="p-5">
+              <HistoryPanel tableName="FormEntries" recordId={historyRow.id} />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
-export default ValidatePage;        
+export default ValidatePage;

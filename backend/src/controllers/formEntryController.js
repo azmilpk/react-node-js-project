@@ -43,12 +43,13 @@ const getFormEntryById = (req, res, next) => {
   }
 };
 
-// Change Status
+// Change Status (Approve / Reject from Validate page)
 const updateFormEntryStatus = (req, res, next) => {
   try {
     const result = changeFormEntryStatus(
       req.params.id,
-      req.body.status
+      req.body.status,
+      req.body.changedBy
     );
 
     res.json(result);
@@ -57,12 +58,13 @@ const updateFormEntryStatus = (req, res, next) => {
   }
 };
 
-// Update Entry (UL Pure Details Page)
+// Update Entry (Modify + Save from Validate Details Page)
 const editFormEntry = (req, res, next) => {
   try {
     const result = updateFormEntryService(
       req.params.id,
-      req.body
+      req.body,
+      req.body.changedBy
     );
 
     res.json(result);
@@ -77,4 +79,4 @@ module.exports = {
   getFormEntryById,
   updateFormEntryStatus,
   editFormEntry,
-};
+};  //formEntryController.js

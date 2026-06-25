@@ -1,6 +1,7 @@
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useState } from 'react';
 import TopNavbar from '../components/topnavbar/TopNavbar';
+import HistoryPanel from '../components/HistoryPanel';
 
 function UlPureDetailsPage() {
   const navigate = useNavigate();
@@ -253,7 +254,7 @@ function UlPureDetailsPage() {
                     placeholder="Enter your comment here..."
                     className="w-full rounded-[12px] border border-black/20 bg-white px-4 py-3 text-[13px] text-black outline-none resize-none"
                   />
-
+     
                   <div className="mt-4 flex justify-end">
                     <button
                       type="button"
@@ -265,6 +266,7 @@ function UlPureDetailsPage() {
                   </div>
                 </div>
               </div>
+              
 
               <div className="bg-white rounded-[18px] shadow-sm p-6 overflow-hidden flex flex-col">
                 <h2 className="text-[22px] font-bold text-black mb-5 shrink-0">

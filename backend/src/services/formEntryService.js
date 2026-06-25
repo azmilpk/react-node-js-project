@@ -1,4 +1,5 @@
 const db = require('../config/db');
+const { logFieldChanges } = require('./auditService');
 
 // Create Entry
 const insertFormEntry = (data) => {
@@ -104,25 +105,24 @@ const fetchFormEntryById = (id) => {
 };
 
 // Change Status
-const changeFormEntryStatus = (id, status) => {
+const changeFormEntryStatus = (id, status, changedBy) => {
   const entry = db.prepare('SELECT * FROM FormEntries WHERE Id = ?').get(id);
-
-  if (!entry) {
-    throw new Error('Entry not found');
-  }
+  if (!entry) throw new Error('Entry not found');
 
   let finalStatus = status;
-
   if (status === 'Validated' && entry.Status === 'Modified') {
     finalStatus = 'Modified and Validated';
   }
 
-  db.prepare(`
-    UPDATE FormEntries
-    SET Status = ?
-    WHERE Id = ?
-  `).run(finalStatus, id);
+  logFieldChanges({
+    tableName: 'FormEntries',
+    recordId: id,
+    oldRecord: entry,
+    newFields: { Status: finalStatus },
+    changedBy: changedBy || 'Unknown User',
+  });
 
+  db.prepare('UPDATE FormEntries SET Status = ? WHERE Id = ?').run(finalStatus, id);
   return db.prepare('SELECT * FROM FormEntries WHERE Id = ?').get(id);
 };
 
@@ -134,22 +134,39 @@ const updateFormEntry = (id, data) => {
     throw new Error('Entry not found');
   }
 
-db.prepare(`
-UPDATE FormEntries
-SET
-  PostingMonth = ?,
-  Consumption = ?,
-  Comment = ?,
-  Status = ?,
-  CreatedAt = datetime('now')
-WHERE Id = ?
-`).run(
-  data.postingMonth || entry.PostingMonth,
-  data.consumption || entry.Consumption,
-  data.comment || entry.Comment || '',
-  'Modified and Validated',
-  id
-);
+  const changedBy = data.changedBy || data.modifiedBy || 'Unknown User';
+
+  const newValues = {
+    PostingMonth: data.postingMonth || entry.PostingMonth,
+    Consumption: data.consumption || entry.Consumption,
+    Comment: data.comment || entry.Comment || '',
+    Status: 'Modified and Validated',
+  };
+
+  logFieldChanges({
+    tableName: 'FormEntries',
+    recordId: id,
+    oldRecord: entry,
+    newFields: newValues,
+    changedBy,
+  });
+
+  db.prepare(`
+    UPDATE FormEntries
+    SET
+      PostingMonth = ?,
+      Consumption = ?,
+      Comment = ?,
+      Status = ?,
+      ModifiedAt = datetime('now')
+    WHERE Id = ?
+  `).run(
+    newValues.PostingMonth,
+    newValues.Consumption,
+    newValues.Comment,
+    newValues.Status,
+    id
+  );
 
   return db.prepare('SELECT * FROM FormEntries WHERE Id = ?').get(id);
 };

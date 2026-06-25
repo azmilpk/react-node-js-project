@@ -3,6 +3,7 @@ const {
   fetchUlPureEntries,
   fetchUlPureEntryById,
   updateUlPureEntry,
+  markUlPureReviewed,
 } = require('../services/ulPureService');
 
 const generateUlPureFromModified = (req, res, next) => {
@@ -37,6 +38,15 @@ const getUlPureEntryById = (req, res, next) => {
   }
 };
 
+const reviewUlPureEntry = (req, res, next) => {
+  try {
+    const result = markUlPureReviewed(req.params.id, req.body.reviewedBy);
+    res.json(result);
+  } catch (error) {
+    next(error);
+  }
+};
+
 const editUlPureEntry = (req, res, next) => {
   try {
     const result = updateUlPureEntry(req.params.id, req.body);
@@ -51,4 +61,5 @@ module.exports = {
   getUlPureEntries,
   getUlPureEntryById,
   editUlPureEntry,
-};
+  reviewUlPureEntry,
+};  // ulPureController.js

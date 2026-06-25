@@ -88,4 +88,8 @@ ensureColumn('UlPureEntries', 'ModifiedBy', 'TEXT');
 ensureColumn('UlPureEntries', 'ModifiedAt', 'TEXT');
 ensureColumn('UlPureEntries', 'EntryName', 'TEXT');
 
+ensureColumn('UlPureEntries', 'ReviewStatus', "TEXT DEFAULT 'Not Reviewed'");
+ensureColumn('UlPureEntries', 'ReviewedBy', 'TEXT');
+ensureColumn('UlPureEntries', 'ReviewedAt', 'TEXT');
+
 console.log('Tables created successfully');

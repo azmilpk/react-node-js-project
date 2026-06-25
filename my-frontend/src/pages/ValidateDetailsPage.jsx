@@ -1,6 +1,7 @@
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useState } from 'react';
 import TopNavbar from '../components/topnavbar/TopNavbar';
+import HistoryPanel from '../components/HistoryPanel';
 
 function ValidateDetailsPage() {
   const navigate = useNavigate();
@@ -341,4 +342,4 @@ const getAuthUser = () => {
   );
 }
 
-export default ValidateDetailsPage;
+export default ValidateDetailsPage; 

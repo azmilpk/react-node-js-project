@@ -10,6 +10,7 @@ const formEntryRoutes = require('./routes/formEntryRoutes');
 const fileRoutes = require('./routes/fileRoutes');
 const authRoutes = require('./routes/authRoutes');
 const ulPureRoutes = require('./routes/ulPureRoutes');
+const auditRoutes = require('./routes/auditRoutes');   // ← ADD THIS
 
 const errorHandler = require('./middleware/errorHandler');
 const db = require('./config/db');
@@ -24,39 +25,22 @@ app.get('/', (req, res) => {
   res.json({ message: 'Backend is running' });
 });
 
-// DB test route
 app.get('/api/test-db', (req, res) => {
   try {
     const result = db.prepare("SELECT datetime('now') AS currentTime").get();
-
-    res.json({
-      message: 'Database connected successfully',
-      data: result,
-    });
+    res.json({ message: 'Database connected successfully', data: result });
   } catch (error) {
-    res.status(500).json({
-      message: 'Database connection failed',
-      error: error.message,
-    });
+    res.status(500).json({ message: 'Database connection failed', error: error.message });
   }
 });
 
-// Blob test route
 app.get('/api/test-blob', async (req, res) => {
   try {
     const containerClient = getContainerClient();
-
     await containerClient.createIfNotExists();
-
-    res.json({
-      message: 'Blob connection successful',
-      container: containerClient.containerName,
-    });
+    res.json({ message: 'Blob connection successful', container: containerClient.containerName });
   } catch (error) {
-    res.status(500).json({
-      message: 'Blob connection failed',
-      error: error.message,
-    });
+    res.status(500).json({ message: 'Blob connection failed', error: error.message });
   }
 });
 
@@ -66,6 +50,7 @@ app.use('/api/form-entries', formEntryRoutes);
 app.use('/api/files', fileRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/ul-pure-entries', ulPureRoutes);
+app.use('/api/audit', auditRoutes);   // ← ADD THIS
 
 app.use(errorHandler);
 

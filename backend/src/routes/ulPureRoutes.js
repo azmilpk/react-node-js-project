@@ -6,11 +6,13 @@ const {
   getUlPureEntries,
   getUlPureEntryById,
   editUlPureEntry,
+  reviewUlPureEntry, 
 } = require('../controllers/ulPureController');
 
+router.put('/:id/review', reviewUlPureEntry);
 router.post('/generate', generateUlPureFromModified);
 router.get('/', getUlPureEntries);
 router.get('/:id', getUlPureEntryById);
 router.put('/:id', editUlPureEntry);
 
-module.exports = router;
+module.exports = router; // ulPureRoutes.js

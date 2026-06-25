@@ -1,18 +1,15 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import TopNavbar from '../components/topnavbar/TopNavbar';
 import { unitForUtility } from '../utils/units';
 
-function UlPurePage() {
+function AuditorUlPurePage() {
   const navigate = useNavigate();
-  const location = useLocation();
-
-  const selectedFacilityFromNav = location.state?.facility || '';
-  const selectedSiteFromNav = location.state?.site || '';
-  const selectedEntryFromNav = location.state?.entry || '';
 
   const [tableData, setTableData] = useState([]);
   const [loading, setLoading] = useState(true);
+
+  const [siteFilter, setSiteFilter] = useState('');
   const [utilityFilter, setUtilityFilter] = useState('');
   const [monthFilter, setMonthFilter] = useState('');
   const [yearFilter, setYearFilter] = useState('');
@@ -33,26 +30,19 @@ function UlPurePage() {
       }
 
       const mappedData = result.map((item) => {
-        const site = item.SiteCode || item.siteCode || '-';
-        const facility =
-          selectedFacilityFromNav ||
+        const site =
           item.FacilityCode ||
           item.facilityCode ||
-          site ||
+          item.SiteCode ||
+          item.siteCode ||
           '-';
-
-        const entry =
-          item.EntryName ||
-          item.entryName ||
-          `${facility}-${site}`;
 
         return {
           Id: item.Id || item.id,
           id: item.Id || item.id,
           entryNumber: item.EntryNumber || item.entryNumber,
-          facility,
           site,
-          entry,
+          siteCode: item.SiteCode || item.siteCode || '',
           utility:
             item.UtilityName ||
             item.utilityName ||
@@ -66,7 +56,6 @@ function UlPurePage() {
           status: item.Status || item.status || 'Validate',
           fileName: item.FileName || item.fileName || 'No file uploaded',
           fileUrl: item.FileUrl || item.fileUrl || '',
-          comment: item.Comment || item.comment || '',
         };
       });
 
@@ -82,31 +71,20 @@ function UlPurePage() {
     return tableData.filter((row) => {
       const [year, month] = (row.postingMonth || '').split('-');
 
-      const normalizedSelectedSite = (selectedSiteFromNav || '').trim().toLowerCase();
-      const rowSite = (row.site || '').trim().toLowerCase();
-
-      const matchSite =
-        !selectedSiteFromNav || rowSite === normalizedSelectedSite;
-
+      const matchSite = !siteFilter || row.site === siteFilter;
       const matchUtility = !utilityFilter || row.utility === utilityFilter;
       const matchMonth = !monthFilter || month === monthFilter;
       const matchYear = !yearFilter || year === yearFilter;
 
       return matchSite && matchUtility && matchMonth && matchYear;
     });
-  }, [
-    tableData,
-    selectedSiteFromNav,
-    utilityFilter,
-    monthFilter,
-    yearFilter,
-  ]);
+  }, [tableData, siteFilter, utilityFilter, monthFilter, yearFilter]);
 
-  const utilityOptions = [...new Set(filteredData.map((row) => row.utility).filter(Boolean))];
-
+  const siteOptions = [...new Set(tableData.map((row) => row.site).filter(Boolean))];
+  const utilityOptions = [...new Set(tableData.map((row) => row.utility).filter(Boolean))];
   const yearOptions = [
     ...new Set(
-      filteredData
+      tableData
         .map((row) => (row.postingMonth || '').split('-')[0])
         .filter(Boolean)
     ),
@@ -116,21 +94,21 @@ function UlPurePage() {
     return sum + Number(row.consumption || 0);
   }, 0);
 
-  const handleViewDetails = (row) => {
-    navigate('/ul-pure-details', {
-      state: {
-        selectedEntry: row,
-        selectedSite: selectedSiteFromNav,
-        selectedFacility: selectedFacilityFromNav,
-        selectedEntryLabel: selectedEntryFromNav,
-      },
-    });
-  };
-
   const handleResetFilters = () => {
+    setSiteFilter('');
     setUtilityFilter('');
     setMonthFilter('');
     setYearFilter('');
+  };
+
+  const handleReview = (row) => {
+    navigate('/auditor-validate-data', {
+      state: {
+        utility: row.utility,
+        site: row.site,
+        siteCode: row.siteCode,
+      },
+    });
   };
 
   return (
@@ -141,12 +119,12 @@ function UlPurePage() {
         <section className="w-full max-w-[1450px] mx-auto">
           <div className="flex items-center justify-between mb-6">
             <h1 className="text-[28px] sm:text-[36px] lg:text-[44px] xl:text-[48px] leading-tight font-bold text-black">
-              UL PURE DATA - {selectedEntryFromNav || selectedSiteFromNav || 'All Facilities'}
+              UL PURE DATA
             </h1>
 
             <button
               type="button"
-              onClick={() => navigate('/site-owner')}
+              onClick={() => navigate('/')}
               className="min-w-[130px] h-[42px] px-5 rounded-full bg-black text-white text-[13px] font-semibold hover:bg-neutral-800 transition duration-300"
             >
               Go Back
@@ -154,7 +132,25 @@ function UlPurePage() {
           </div>
 
           <div className="bg-white rounded-[18px] shadow-sm p-4 mb-6">
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+            <div className="grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
+              <div>
+                <label className="block text-[13px] font-semibold text-black mb-2">
+                  Site
+                </label>
+                <select
+                  value={siteFilter}
+                  onChange={(e) => setSiteFilter(e.target.value)}
+                  className="w-full h-[42px] rounded-[12px] border border-black/20 px-4 bg-white text-[13px] outline-none"
+                >
+                  <option value="">Find items</option>
+                  {siteOptions.map((site) => (
+                    <option key={site} value={site}>
+                      {site}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
               <div>
                 <label className="block text-[13px] font-semibold text-black mb-2">
                   Utility
@@ -175,7 +171,7 @@ function UlPurePage() {
 
               <div>
                 <label className="block text-[13px] font-semibold text-black mb-2">
-                  Reporting Month
+                  Month
                 </label>
                 <select
                   value={monthFilter}
@@ -200,7 +196,7 @@ function UlPurePage() {
 
               <div>
                 <label className="block text-[13px] font-semibold text-black mb-2">
-                  Report Year
+                  Year
                 </label>
                 <select
                   value={yearFilter}
@@ -217,9 +213,6 @@ function UlPurePage() {
               </div>
 
               <div>
-                <label className="block text-[13px] font-semibold text-black mb-2">
-                  Reset
-                </label>
                 <button
                   type="button"
                   onClick={handleResetFilters}
@@ -233,14 +226,14 @@ function UlPurePage() {
 
           <div className="bg-white rounded-[18px] shadow-sm overflow-hidden">
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[1250px] border-collapse">
+                            <table className="w-full min-w-[1280px] border-collapse">
                 <thead>
                   <tr className="bg-black text-white">
                     <th className="px-4 py-3 text-left text-[13px] font-semibold">Utility</th>
                     <th className="px-4 py-3 text-left text-[13px] font-semibold">Region Name</th>
                     <th className="px-4 py-3 text-left text-[13px] font-semibold">Consumption</th>
                     <th className="px-4 py-3 text-left text-[13px] font-semibold">Units</th>
-                    <th className="px-4 py-3 text-left text-[13px] font-semibold">Region Id</th>
+                    <th className="px-4 py-3 text-left text-[13px] font-semibold">Regon Id</th>
                     <th className="px-4 py-3 text-left text-[13px] font-semibold">Indicator Name</th>
                     <th className="px-4 py-3 text-left text-[13px] font-semibold">Indicator Id</th>
                     <th className="px-4 py-3 text-left text-[13px] font-semibold">Report Date</th>
@@ -251,15 +244,15 @@ function UlPurePage() {
                 <tbody>
                   {loading ? (
                     <tr>
-                      <td colSpan="9" className="px-4 py-8 text-center text-[13px] text-black/60">
+                      <td colSpan="6" className="px-4 py-8 text-center text-[13px] text-black/60">
                         Loading...
                       </td>
                     </tr>
                   ) : filteredData.length > 0 ? (
-                    filteredData.map((row) => (
+                                        filteredData.map((row) => (
                       <tr key={row.id} className="border-b border-black/10 hover:bg-black/5">
                         <td className="px-4 py-4 text-[13px] text-black">{row.utility}</td>
-                        <td className="px-4 py-4 text-[13px] text-black">{row.entry || row.site}</td>
+                        <td className="px-4 py-4 text-[13px] text-black">{row.site}</td>
                         <td className="px-4 py-4 text-[13px] text-black">{row.consumption}</td>
                         <td className="px-4 py-4 text-[13px] text-black">{row.units}</td>
                         <td className="px-4 py-4 text-[13px] text-black">{row.accountMeterNo}</td>
@@ -267,26 +260,20 @@ function UlPurePage() {
                         <td className="px-4 py-4 text-[13px] text-black">{row.entryNumber}</td>
                         <td className="px-4 py-4 text-[13px] text-black">{row.postingMonth}</td>
                         <td className="px-4 py-4">
- <button
-  type="button"
-  onClick={() => handleViewDetails(row)}
-  className={`h-[34px] px-4 rounded-full text-white text-[12px] font-semibold transition duration-300 ${
-    row.status === 'Validated'
-      ? 'bg-green-600 hover:bg-green-700'
-      : 'bg-sky-500 hover:bg-sky-600'
-  }`}
->
-  {row.status === 'Validated'
-    ? 'Validated'
-    : 'Validate'}
-</button>
-</td>
+                          <button
+                            type="button"
+                            onClick={() => handleReview(row)}
+                            className="h-[34px] px-4 rounded-full bg-sky-500 text-white text-[12px] font-semibold hover:bg-sky-600 transition duration-300"
+                          >
+                            Review
+                          </button>
+                        </td>
                       </tr>
                     ))
                   ) : (
                     <tr>
-                      <td colSpan="9" className="px-4 py-8 text-center text-[13px] text-black/60">
-                        No validated data available.
+                      <td colSpan="6" className="px-4 py-8 text-center text-[13px] text-black/60">
+                        No data available.
                       </td>
                     </tr>
                   )}
@@ -298,13 +285,6 @@ function UlPurePage() {
               <div className="text-[14px] font-semibold text-black">
                 Total Consumption : {totalConsumption}
               </div>
-
-              <button
-                type="button"
-                className="h-[40px] px-5 rounded-full bg-black text-white text-[13px] font-semibold hover:bg-neutral-800 transition duration-300"
-              >
-                Generate ULpure Report
-              </button>
             </div>
           </div>
         </section>
@@ -313,4 +293,4 @@ function UlPurePage() {
   );
 }
 
-export default UlPurePage;
+export default AuditorUlPurePage;

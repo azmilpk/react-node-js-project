@@ -53,7 +53,7 @@ function LoginPage() {
       );
 
       if (actualRole === 'Auditor') {
-        navigate('/ul-pure');
+         navigate('/auditor-ul-pure');
       } else if (actualRole === 'SiteOwner') {
         navigate('/site-owner');
       } else {

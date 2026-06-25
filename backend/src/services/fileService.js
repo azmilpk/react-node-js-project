@@ -65,6 +65,7 @@ const streamBlobToResponse = async (blobUrl, res) => {
   }
 
   res.setHeader('Content-Disposition', 'inline');
+  res.setHeader('Cache-Control', 'private, max-age=86400');
 
   downloadResponse.readableStreamBody.pipe(res);
 };

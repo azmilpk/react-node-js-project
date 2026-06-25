@@ -1,4 +1,6 @@
 const db = require('../config/db');
+const { logFieldChanges } = require('./auditService');
+
 // Insert into UL Pure table
 const insertUlPureEntryFromFormEntry = (formEntry) => {
   const existing = db
@@ -147,16 +149,28 @@ const fetchUlPureEntryById = (id) => {
 
 // Save from UL Pure Details page
 const updateUlPureEntry = (id, data) => {
-
-  const entry = db
-    .prepare(
-      'SELECT * FROM UlPureEntries WHERE Id = ?'
-    )
-    .get(id);
+  const entry = db.prepare('SELECT * FROM UlPureEntries WHERE Id = ?').get(id);
 
   if (!entry) {
     throw new Error('UL Pure entry not found');
   }
+
+  const changedBy = data.modifiedBy || data.changedBy || 'Unknown User';
+
+  const newValues = {
+    PostingMonth: data.postingMonth || entry.PostingMonth,
+    Consumption: data.consumption || entry.Consumption,
+    Comment: data.comment || entry.Comment || '',
+    Status: 'Validated',
+  };
+
+  logFieldChanges({
+    tableName: 'UlPureEntries',
+    recordId: id,
+    oldRecord: entry,
+    newFields: newValues,
+    changedBy,
+  });
 
   db.prepare(`
     UPDATE UlPureEntries
@@ -169,21 +183,31 @@ const updateUlPureEntry = (id, data) => {
       ModifiedAt = datetime('now')
     WHERE Id = ?
   `).run(
-    data.postingMonth || entry.PostingMonth,
-    data.consumption || entry.Consumption,
-    data.comment || entry.Comment || '',
-    'Validated', // <-- GREEN STATUS AFTER SAVE
-    data.modifiedBy || 'Unknown User',
+    newValues.PostingMonth,
+    newValues.Consumption,
+    newValues.Comment,
+    newValues.Status,
+    changedBy,
     id
   );
 
-  return db
-    .prepare(
-      'SELECT * FROM UlPureEntries WHERE Id = ?'
-    )
-    .get(id);
+  return db.prepare('SELECT * FROM UlPureEntries WHERE Id = ?').get(id);
 };
 
+const markUlPureReviewed = (id, reviewedBy) => {
+  const entry = db.prepare('SELECT * FROM UlPureEntries WHERE Id = ?').get(id);
+  if (!entry) throw new Error('UL Pure entry not found');
+
+  db.prepare(`
+    UPDATE UlPureEntries
+    SET ReviewStatus = 'Reviewed',
+        ReviewedBy = ?,
+        ReviewedAt = datetime('now')
+    WHERE Id = ?
+  `).run(reviewedBy || 'Unknown User', id);
+
+  return db.prepare('SELECT * FROM UlPureEntries WHERE Id = ?').get(id);
+};
 
 
 // Clear table
@@ -206,5 +230,6 @@ module.exports = {
   fetchUlPureEntries,
   fetchUlPureEntryById,
   updateUlPureEntry,
+  markUlPureReviewed,
   clearUlPureEntries,
-};
+}; // ulPureService.js
