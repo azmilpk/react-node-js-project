@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import TopNavbar from '../components/topnavbar/TopNavbar';
 import HistoryPanel from '../components/HistoryPanel';
 import { getCurrentUserName, getCurrentUserRole } from '../utils/currentUser';
+import { unitForUtility } from '../utils/units';
 
 function ValidatePage() {
   const navigate = useNavigate();
@@ -71,7 +72,7 @@ function ValidatePage() {
           siteCode,
           accountMeterNo: item.AccountMeterNo || item.accountMeterNo || '-',
           consumption: item.Consumption || item.consumption || '-',
-          units: item.Units || item.units || '-',
+          units: item.Units || item.units || unitForUtility(item.UtilityName || item.utilityName || item.UtilityCode || item.utilityCode),
           recordDate: item.PostingMonth || item.postingMonth || '-',
           postingMonth: item.PostingMonth || item.postingMonth || '-',
           status: item.Status || item.status || 'Pending',
@@ -400,14 +401,16 @@ function ValidatePage() {
                     <th className="px-4 py-3 text-left text-[13px] font-semibold">
                       {isAuditor ? 'History' : 'Validate Data'}
                     </th>
+                    <th className="px-4 py-3 text-left text-[13px] font-semibold">History</th>
                     <th className="px-4 py-3 text-left text-[13px] font-semibold">Download File</th>
-                  </tr>
+                    
+                    </tr>
                 </thead>
 
                 <tbody>
                   {loading ? (
                     <tr>
-                      <td colSpan="9" className="px-4 py-8 text-center text-[13px] text-black/60">
+                      <td colSpan="10" className="px-4 py-8 text-center text-[13px] text-black/60">
                         Loading...
                       </td>
                     </tr>
@@ -464,6 +467,16 @@ function ValidatePage() {
                           )}
                         </td>
 
+                          <td className="px-4 py-4">
+                          <button
+                            type="button"
+                            onClick={() => setHistoryRow(row)}
+                            className="h-[34px] px-4 rounded-full border border-black/20 text-black text-[12px] font-semibold hover:bg-black hover:text-white transition duration-300"
+                          >
+                            History
+                          </button>
+                        </td>
+
                         <td className="px-4 py-4">
                           <button
                             type="button"
@@ -477,7 +490,7 @@ function ValidatePage() {
                     ))
                   ) : (
                     <tr>
-                      <td colSpan="9" className="px-4 py-8 text-center text-[13px] text-black/60">
+                      <td colSpan="10" className="px-4 py-8 text-center text-[13px] text-black/60">
                         No records found.
                       </td>
                     </tr>
@@ -586,4 +599,4 @@ function ValidatePage() {
   );
 }
 
-export default ValidatePage;
+export default ValidatePage; // hai

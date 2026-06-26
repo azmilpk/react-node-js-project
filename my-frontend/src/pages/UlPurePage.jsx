@@ -245,6 +245,7 @@ function UlPurePage() {
                     <th className="px-4 py-3 text-left text-[13px] font-semibold">Indicator Id</th>
                     <th className="px-4 py-3 text-left text-[13px] font-semibold">Report Date</th>
                     <th className="px-4 py-3 text-left text-[13px] font-semibold">Validate</th>
+                    <th className="px-4 py-3 text-left text-[13px] font-semibold">History</th>
                   </tr>
                 </thead>
 
