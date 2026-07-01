@@ -4,6 +4,7 @@ import TopNavbar from '../components/topnavbar/TopNavbar';
 import HistoryPanel from '../components/HistoryPanel';
 import { getCurrentUserName } from '../utils/currentUser';
 import { unitForUtility } from '../utils/units';
+import { API_BASE_URL } from '../config/api';
 
 function AuditorValidatePage() {
   const navigate = useNavigate();
@@ -28,7 +29,7 @@ function AuditorValidatePage() {
     try {
       setLoading(true);
 
-      const response = await fetch('http://localhost:5000/api/ul-pure-entries');
+      const response = await fetch(`${API_BASE_URL}/api/ul-pure-entries`);
       const result = await response.json();
 
       if (!response.ok) {
@@ -118,7 +119,7 @@ function AuditorValidatePage() {
     setReviewedIds((prev) => new Set(prev).add(row.id));
     try {
       await fetch(
-        `http://localhost:5000/api/ul-pure-entries/${row.id}/review`,
+        `${API_BASE_URL}/api/ul-pure-entries/${row.id}/review`,
         {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
@@ -136,7 +137,7 @@ function AuditorValidatePage() {
       return;
     }
 
-    const previewUrl = `http://localhost:5000/api/files/view?blobUrl=${encodeURIComponent(
+    const previewUrl = `${API_BASE_URL}/api/files/view?blobUrl=${encodeURIComponent(
       row.fileUrl
     )}`;
 

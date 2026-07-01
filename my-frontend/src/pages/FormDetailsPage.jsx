@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import TopNavbar from '../components/topnavbar/TopNavbar';
 import { formConfigBySiteUtility } from '../config/formConfig';
+import { API_BASE_URL } from '../config/api';
 
 function FormDetailsPage() {
   const navigate = useNavigate();
@@ -69,24 +70,27 @@ function FormDetailsPage() {
     return monthsMap[monthName] || '01';
   };
 
-  const handleChange = (name, value) => {
-    setFormValues((prev) => {
-      const updated = {
-        ...prev,
-        [name]: value,
-      };
+ const handleChange = (name, value) => {
+  setFormValues((prev) => {
+    const updated = { ...prev, [name]: value };
 
-      if (name === 'reportingMonth' && prev.postingMonth) {
-        const currentPosting = prev.postingMonth || '2026-01';
-        const year = currentPosting.split('-')[0] || '2026';
-        updated.postingMonth = `${year}-${monthToNumber(value)}`;
-      }
+    if (name === 'reportingMonth' && prev.postingMonth) {
+      const year = prev.postingMonth.split('-')[0] || String(new Date().getFullYear());
+      updated.postingMonth = `${year}-${monthToNumber(value)}`;
+    }
 
-      return updated;
-    });
+    // NEW: when the Year dropdown changes, swap the year part of postingMonth
+    if (name === 'year' && prev.postingMonth) {
+      const parts = prev.postingMonth.split('-');
+      const month = parts[1] || '01';
+      updated.postingMonth = `${value}-${month}`;
+    }
 
-    setMessage('');
-  };
+    return updated;
+  });
+
+  setMessage('');
+};
 
   const validateForm = () => {
     const editableFields = formConfig?.editableFields || [];
@@ -129,7 +133,7 @@ function FormDetailsPage() {
         const fileFormData = new FormData();
         fileFormData.append('file', selectedFile);
 
-        const uploadResponse = await fetch('http://localhost:5000/api/files/upload', {
+        const uploadResponse = await fetch(`${API_BASE_URL}/api/files/upload`, {
           method: 'POST',
           body: fileFormData,
         });
@@ -167,7 +171,7 @@ function FormDetailsPage() {
         fileUrl: uploadedFileData.fileUrl,
       };
 
-      const response = await fetch('http://localhost:5000/api/form-entries', {
+      const response = await fetch(`${API_BASE_URL}/api/form-entries`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -239,7 +243,7 @@ function FormDetailsPage() {
                             <input
                               type="file"
                               className="hidden"
-                              accept=".pdf,image/*"
+                              accept=".pdf,.xlsx,.xls,.csv,image/*,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
                               onChange={(e) =>
                                 setSelectedFile(e.target.files?.[0] || null)
                               }

@@ -30,8 +30,30 @@ const logFieldChanges = ({ tableName, recordId, oldRecord, newFields, changedBy 
     });
   });
 };
+const fetchCombinedUlPureHistory = (ulPureId) => {
+  const entry = db
+    .prepare('SELECT SourceEntryId FROM UlPureEntries WHERE Id = ?')
+    .get(ulPureId);
 
+  const ulPureLogs = db
+    .prepare(`SELECT * FROM AuditLog WHERE TableName = 'UlPureEntries' AND RecordId = ?`)
+    .all(ulPureId);
+
+  let formLogs = [];
+  if (entry && entry.SourceEntryId) {
+    formLogs = db
+      .prepare(`SELECT * FROM AuditLog WHERE TableName = 'FormEntries' AND RecordId = ?`)
+      .all(entry.SourceEntryId);
+  }
+
+  return [...ulPureLogs, ...formLogs].sort(
+    (a, b) => new Date(b.ChangedAt) - new Date(a.ChangedAt)
+  );
+};
 const fetchAuditHistory = (tableName, recordId) => {
+  if (tableName === 'UlPureEntries') {
+    return fetchCombinedUlPureHistory(recordId);
+  }
   return db
     .prepare(`
       SELECT * FROM AuditLog
@@ -40,9 +62,9 @@ const fetchAuditHistory = (tableName, recordId) => {
     `)
     .all(tableName, recordId);
 };
-
 module.exports = {
   logChange,
   logFieldChanges,
   fetchAuditHistory,
+  fetchCombinedUlPureHistory,
 };

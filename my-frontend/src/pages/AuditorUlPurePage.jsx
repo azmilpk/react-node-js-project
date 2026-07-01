@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import TopNavbar from '../components/topnavbar/TopNavbar';
 import { unitForUtility } from '../utils/units';
+import { API_BASE_URL } from '../config/api';
 
 function AuditorUlPurePage() {
   const navigate = useNavigate();
@@ -22,7 +23,7 @@ function AuditorUlPurePage() {
     try {
       setLoading(true);
 
-      const response = await fetch('http://localhost:5000/api/ul-pure-entries');
+      const response = await fetch(`${API_BASE_URL}/api/ul-pure-entries`);
       const result = await response.json();
 
       if (!response.ok) {
@@ -51,7 +52,7 @@ function AuditorUlPurePage() {
             '-',
           accountMeterNo: item.AccountMeterNo || item.accountMeterNo || '-',
           consumption: item.Consumption || item.consumption || '-',
-          units: item.Units || item.units || unitForUtility(item.Utility || item.utility),
+          units: item.Units || item.units || unitForUtility(item.UtilityName || item.utilityName || item.UtilityCode || item.utilityCode),
           postingMonth: item.PostingMonth || item.postingMonth || '-',
           status: item.Status || item.status || 'Validate',
           fileName: item.FileName || item.fileName || 'No file uploaded',

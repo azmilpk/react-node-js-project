@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import TopNavbar from '../components/topnavbar/TopNavbar';
 import volvoLogo from '../assets/images/VolvoLogo.png';
+import { API_BASE_URL } from '../config/api';
 
 function LoginPage() {
   const navigate = useNavigate();
@@ -17,7 +18,7 @@ function LoginPage() {
     try {
       setIsLoading(true);
 
-      const response = await fetch('http://localhost:5000/api/auth/login', {
+      const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

@@ -1,3 +1,9 @@
+const now = new Date();
+const currentYear = String(now.getFullYear());
+// "YYYY-MM" e.g. 2026-06
+const currentPostingMonth = `${currentYear}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+// If you actually want the full date "YYYY-MM-DD":
+// const currentPostingMonth = now.toISOString().slice(0, 10);
 const months = [
   'January',
   'February',
@@ -17,7 +23,7 @@ const directEntryForm = ({
   facilityDefault = '',
   utility,
   units,
-  postingMonth = '2026-01',
+  postingMonth = currentPostingMonth,
   accountMeterNoDefault,
   consumptionLabel = 'Consumption',
   consumptionPlaceholder = 'Enter value',
@@ -85,20 +91,20 @@ const kopingForms = {
         defaultValue: 'Köping',
       },
       {
+        name: 'utility',
+        label: 'Utility',
+        type: 'text',
+        required: true,
+        defaultValue: 'Electricity',
+      },
+      {
         name: 'meterReading',
         label: 'Meter Reading',
         type: 'number',
         placeholder: 'Enter the handler',
         required: true,
       },
-      {
-        name: 'reportingMonth',
-        label: 'Reporting Month',
-        type: 'select',
-        required: true,
-        options: months,
-        defaultValue: 'January',
-      },
+     
       {
         name: 'units',
         label: 'Units',
@@ -106,13 +112,7 @@ const kopingForms = {
         required: true,
         defaultValue: 'kWh',
       },
-      {
-        name: 'utility',
-        label: 'Utility',
-        type: 'text',
-        required: true,
-        defaultValue: 'Electricity',
-      },
+      
       {
         name: 'accountMeterNo',
         label: 'Account Number / Meter No',
@@ -121,12 +121,29 @@ const kopingForms = {
         options: ['Elektriciteit_billadaplaser_kwh'],
         defaultValue: 'Elektriciteit_billadaplaser_kwh',
       },
+      
       {
         name: 'postingMonth',
         label: 'Posting Date Month',
         type: 'text',
         required: true,
-        defaultValue: '2026-01',
+        defaultValue: currentPostingMonth,
+      },
+       {
+        name: 'reportingMonth',
+        label: 'Reporting Month',
+        type: 'select',
+        required: true,
+        options: months,
+        defaultValue: 'January',
+      },
+      {
+        name:'year',
+        label:'Year',
+        type:'select',
+        options: ['2026','2027','2028','2029','2030'],
+        required:true,
+        defaultValue: currentYear,
       },
       {
         name: 'attachments',
@@ -140,40 +157,11 @@ const kopingForms = {
   diesel: {
     editableFields: [
       {
-        name: 'reportingMonth',
-        label: 'Reporting Month',
-        type: 'select',
-        required: true,
-        options: months,
-        defaultValue: 'January',
-      },
-      {
         name: 'facility',
         label: 'Facility',
         type: 'text',
         required: true,
         defaultValue: 'Köping',
-      },
-      {
-        name: 'consumption',
-        label: 'Consumption',
-        type: 'number',
-        placeholder: 'Enter the handler',
-        required: true,
-      },
-      {
-        name: 'postingMonth',
-        label: 'Posting Date Month',
-        type: 'text',
-        required: true,
-        defaultValue: '2026-01',
-      },
-      {
-        name: 'units',
-        label: 'Units',
-        type: 'text',
-        required: true,
-        defaultValue: 'MWh',
       },
       {
         name: 'utility',
@@ -183,12 +171,51 @@ const kopingForms = {
         defaultValue: 'Diesel',
       },
       {
+        name: 'consumption',
+        label: 'Consumption',
+        type: 'number',
+        placeholder: 'Enter the handler',
+        required: true,
+      },
+      
+      {
+        name: 'units',
+        label: 'Units',
+        type: 'text',
+        required: true,
+        defaultValue: 'MWh',
+      },
+   
+      {
         name: 'accountMeterNo',
         label: 'Account Number / Meter No',
         type: 'select',
         required: true,
         options: ['Diesel'],
         defaultValue: 'Diesel',
+      },
+      {
+        name: 'postingMonth',
+        label: 'Posting Date Month',
+        type: 'text',
+        required: true,
+        defaultValue: currentPostingMonth,
+      },
+       {
+        name: 'reportingMonth',
+        label: 'Reporting Month',
+        type: 'select',
+        required: true,
+        options: months,
+        defaultValue: 'January',
+      },
+      {
+        name:'year',
+        label:'Year',
+        type:'select',
+        options: ['2026','2027','2028','2029','2030'],
+        required:true,
+        defaultValue: currentYear,
       },
       {
         name: 'attachments',
@@ -209,20 +236,20 @@ const kopingForms = {
         defaultValue: 'Köping',
       },
       {
+        name: 'utility',
+        label: 'Utility',
+        type: 'text',
+        required: true,
+        defaultValue: 'District Heating',
+      },
+      {
         name: 'meterReading',
         label: 'Meter Reading',
         type: 'number',
         placeholder: 'Enter the handler',
         required: true,
       },
-      {
-        name: 'reportingMonth',
-        label: 'Reporting Month',
-        type: 'select',
-        required: true,
-        options: months,
-        defaultValue: 'January',
-      },
+     
       {
         name: 'units',
         label: 'Units',
@@ -230,13 +257,7 @@ const kopingForms = {
         required: true,
         defaultValue: 'MWh',
       },
-      {
-        name: 'utility',
-        label: 'Utility',
-        type: 'text',
-        required: true,
-        defaultValue: 'District Heating',
-      },
+      
       {
         name: 'accountMeterNo',
         label: 'Account Number / Meter No',
@@ -245,25 +266,15 @@ const kopingForms = {
         options: ['Huvudmätare_1_MWh'],
         defaultValue: 'Huvudmätare_1_MWh',
       },
+      
       {
         name: 'postingMonth',
         label: 'Posting Date Month',
         type: 'text',
         required: true,
-        defaultValue: '2026-01',
+        defaultValue: currentPostingMonth,
       },
-      {
-        name: 'attachments',
-        label: 'Attachments',
-        type: 'file',
-        required: false,
-      },
-    ],
-  },
-
-  water: {
-    editableFields: [
-      {
+       {
         name: 'reportingMonth',
         label: 'Reporting Month',
         type: 'select',
@@ -271,19 +282,33 @@ const kopingForms = {
         options: months,
         defaultValue: 'January',
       },
+       {
+        name:'year',
+        label:'Year',
+        type:'select',
+        options: ['2026','2027','2028','2029','2030'],
+        required:true,
+        defaultValue: currentYear,
+      },
+      {
+        name: 'attachments',
+        label: 'Attachments*',
+        type: 'file',
+        required: false,
+      },
+     
+    ],
+  },
+
+  water: {
+    editableFields: [
+     
       {
         name: 'facility',
         label: 'Facility',
         type: 'text',
         required: true,
         defaultValue: 'Köping',
-      },
-      {
-        name: 'postingMonth',
-        label: 'Posting Date Month',
-        type: 'text',
-        required: true,
-        defaultValue: '2026-01',
       },
       {
         name: 'utility',
@@ -322,6 +347,29 @@ const kopingForms = {
         required: true,
       },
       {
+        name: 'postingMonth',
+        label: 'Posting Date Month',
+        type: 'text',
+        required: true,
+        defaultValue: currentPostingMonth,
+      },
+       {
+        name: 'reportingMonth',
+        label: 'Reporting Month',
+        type: 'select',
+        required: true,
+        options: months,
+        defaultValue: 'January',
+      },
+      {
+        name:'year',
+        label:'Year',
+        type:'select',
+        options: ['2026','2027','2028','2029','2030'],
+        required:true,
+        defaultValue: currentYear,
+      },
+      {
         name: 'attachments',
         label: 'Attachments',
         type: 'file',
@@ -333,12 +381,43 @@ const kopingForms = {
   lpg: {
     editableFields: [
       {
+        name: 'utility',
+        label: 'Utility',
+        type: 'text',
+        required: true,
+        defaultValue: 'LPG',
+      },
+      {
         name: 'consumption',
         label: 'Consumption',
         type: 'number',
         required: true,
         defaultValue: '12900',
       },
+      {
+        name: 'postingMonth',
+        label: 'Posting Date Month',
+        type: 'text',
+        required: true,
+        defaultValue: currentPostingMonth,
+      },
+       {
+        name: 'reportingMonth',
+        label: 'Reporting Month',
+        type: 'select',
+        required: true,
+        options: months,
+        defaultValue: 'January',
+      },
+      {
+        name:'year',
+        label:'Year',
+        type:'select',
+        options: ['2026','2027','2028','2029','2030'],
+        required:true,
+        defaultValue: currentYear,
+      },
+      
       {
         name: 'attachments',
         label: 'Attachments',
@@ -360,19 +439,21 @@ const nrvForms = {
         defaultValue: 'NRV',
       },
       {
+        name: 'utility',
+        label: 'Utility',
+        type: 'text',
+        required: true,
+        defaultValue: 'LPG',
+      },
+      
+      {
         name: 'meterReading',
         label: 'Meter Reading',
         type: 'number',
         placeholder: 'Enter the handler',
         required: true,
       },
-      {
-        name: 'postingMonth',
-        label: 'Posting Date Month',
-        type: 'text',
-        required: true,
-        defaultValue: '2026-05',
-      },
+      
       {
         name: 'units',
         label: 'Units',
@@ -380,19 +461,37 @@ const nrvForms = {
         required: true,
         defaultValue: 'kWh',
       },
-      {
-        name: 'utility',
-        label: 'Utility',
-        type: 'text',
-        required: true,
-        defaultValue: 'Renewable Electricity',
-      },
-      {
+       {
         name: 'accountMeterNo',
         label: 'Account Number / Meter No',
-        type: 'text',
+        type: 'select',
+        options: ['Solar PV array 75'],
         required: true,
         defaultValue: 'Solar PV array 75',
+      },
+      {
+        name: 'postingMonth',
+        label: 'Posting Date Month',
+        type: 'text',
+        required: true,
+        defaultValue: currentPostingMonth,
+      },
+      {
+        name: 'reportingMonth',
+        label: 'Reporting Month',
+        type: 'select',
+        required: true,
+        options: months,
+        defaultValue: 'January',
+      },
+     
+       {
+        name:'year',
+        label:'Year',
+        type:'select',
+        options: ['2026','2027','2028','2029','2030'],
+        required:true,
+        defaultValue: currentYear,
       },
       {
         name: 'attachments',
@@ -417,7 +516,7 @@ const lvlcForms = {
   }),
   propane: directEntryForm({
     utility: 'Propane',
-    units: 'litres',
+    units: 'liters',
     accountMeterNoDefault: 'TEST-LVLC-PROP-001',
   }),
 };
@@ -452,12 +551,13 @@ const macungieForms = {
         label: 'Posting Month',
         type: 'month',
         required: true,
-        defaultValue: '2026-06',
+        defaultValue: currentPostingMonth,
       },
       {
-        name: 'utility',
-        label: 'Utility',
-        type: 'text',
+        name: 'year',
+        label: 'Year',
+        type: 'select',
+        options: ['2026','2027','2028','2029','2030'],
         required: true,
         defaultValue: 'Produced Units',
       },

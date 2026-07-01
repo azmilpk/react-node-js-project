@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import TopNavbar from '../components/topnavbar/TopNavbar';
 import { unitForUtility } from '../utils/units';
+import HistoryPanel from '../components/HistoryPanel';
+import { API_BASE_URL } from '../config/api';
 
 function UlPurePage() {
   const navigate = useNavigate();
@@ -16,6 +18,7 @@ function UlPurePage() {
   const [utilityFilter, setUtilityFilter] = useState('');
   const [monthFilter, setMonthFilter] = useState('');
   const [yearFilter, setYearFilter] = useState('');
+  const [historyRow, setHistoryRow] = useState(null);
 
   useEffect(() => {
     fetchUlPureEntries();
@@ -25,7 +28,7 @@ function UlPurePage() {
     try {
       setLoading(true);
 
-      const response = await fetch('http://localhost:5000/api/ul-pure-entries');
+      const response = await fetch(`${API_BASE_URL}/api/ul-pure-entries`);
       const result = await response.json();
 
       if (!response.ok) {
@@ -282,6 +285,15 @@ function UlPurePage() {
     : 'Validate'}
 </button>
 </td>
+                        <td className="px-4 py-4">
+                          <button
+                            type="button"
+                            onClick={() => setHistoryRow(row)}
+                            className="h-[34px] px-4 rounded-full border border-black/20 text-black text-[12px] font-semibold hover:bg-black hover:text-white transition duration-300"
+                          >
+                            History
+                          </button>
+                        </td>
                       </tr>
                     ))
                   ) : (
@@ -310,6 +322,32 @@ function UlPurePage() {
           </div>
         </section>
       </main>
+     
+
+      {historyRow && (
+        <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4">
+          <div className="w-full max-w-3xl bg-white rounded-[20px] shadow-xl overflow-hidden">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-black/10">
+              <div>
+                <h2 className="text-[18px] font-bold text-black">Change History</h2>
+                <p className="text-[13px] text-black/60">
+                  {historyRow.utility} — {historyRow.entry || historyRow.site}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setHistoryRow(null)}
+                className="min-w-[100px] h-[38px] px-4 rounded-full bg-black text-white text-[12px] font-semibold hover:bg-neutral-800 transition duration-300"
+              >
+                Close
+              </button>
+            </div>
+            <div className="p-5">
+              <HistoryPanel tableName="UlPureEntries" recordId={historyRow.id} />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

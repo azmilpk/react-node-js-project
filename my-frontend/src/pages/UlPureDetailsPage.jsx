@@ -2,6 +2,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { useState } from 'react';
 import TopNavbar from '../components/topnavbar/TopNavbar';
 import HistoryPanel from '../components/HistoryPanel';
+import { API_BASE_URL } from '../config/api';
 
 function UlPureDetailsPage() {
   const navigate = useNavigate();
@@ -42,7 +43,7 @@ function UlPureDetailsPage() {
   };
 
   const previewUrl = selectedEntry?.fileUrl
-  ? `http://localhost:5000/api/files/view?blobUrl=${encodeURIComponent(
+  ? `${API_BASE_URL}/api/files/view?blobUrl=${encodeURIComponent(
       selectedEntry.fileUrl
     )}`
   : '';
@@ -57,7 +58,7 @@ function UlPureDetailsPage() {
       const entryId = selectedEntry?.id || selectedEntry?.Id;
 
       const response = await fetch(
-        `http://localhost:5000/api/ul-pure-entries/${entryId}`,
+        `${API_BASE_URL}/api/ul-pure-entries/${entryId}`,
         {
           method: 'PUT',
           headers: {

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { API_BASE_URL } from '../config/api';
 
 function HistoryPanel({ tableName, recordId }) {
   const [history, setHistory] = useState([]);
@@ -14,7 +15,7 @@ function HistoryPanel({ tableName, recordId }) {
     try {
       setLoading(true);
       const response = await fetch(
-        `http://localhost:5000/api/audit/${tableName}/${recordId}`
+        `${API_BASE_URL}/api/audit/${tableName}/${recordId}`
       );
       const result = await response.json();
       setHistory(Array.isArray(result) ? result : []);

@@ -4,6 +4,7 @@ import TopNavbar from '../components/topnavbar/TopNavbar';
 import HistoryPanel from '../components/HistoryPanel';
 import { getCurrentUserName, getCurrentUserRole } from '../utils/currentUser';
 import { unitForUtility } from '../utils/units';
+import { API_BASE_URL } from '../config/api';
 
 function ValidatePage() {
   const navigate = useNavigate();
@@ -40,7 +41,7 @@ function ValidatePage() {
     try {
       setLoading(true);
 
-      const response = await fetch('http://localhost:5000/api/form-entries');
+      const response = await fetch(`${API_BASE_URL}/api/form-entries`);
       const result = await response.json();
 
       if (!response.ok) {
@@ -130,7 +131,7 @@ function ValidatePage() {
   const handleValidate = async (row) => {
     try {
       const response = await fetch(
-        `http://localhost:5000/api/form-entries/${row.id}/status`,
+        `${API_BASE_URL}/api/form-entries/${row.id}/status`,
         {
           method: 'PUT',
           headers: {
@@ -219,7 +220,7 @@ function ValidatePage() {
       return;
     }
 
-    const previewUrl = `http://localhost:5000/api/files/view?blobUrl=${encodeURIComponent(
+    const previewUrl = `${API_BASE_URL}/api/files/view?blobUrl=${encodeURIComponent(
       row.fileUrl
     )}`;
 
@@ -242,7 +243,7 @@ function ValidatePage() {
 
   const handleGenerateUlPure = async () => {
     try {
-      const response = await fetch('http://localhost:5000/api/ul-pure-entries/generate', {
+      const response = await fetch(`${API_BASE_URL}/api/ul-pure-entries/generate`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
