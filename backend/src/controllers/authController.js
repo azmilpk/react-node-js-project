@@ -1,5 +1,5 @@
 const { loginUser } = require('../services/authService');
-console.log('loginUser =', loginUser);
+
 const login = (req, res, next) => {
   try {
     const { email, password } = req.body;
@@ -12,7 +12,8 @@ const login = (req, res, next) => {
       });
     }
 
-    res.json(user);
+    const { Password, ...safeUser } = user;
+    res.json(safeUser);
   } catch (error) {
     next(error);
   }

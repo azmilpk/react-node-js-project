@@ -1,6 +1,92 @@
 const db = require('../config/db');
 const { logFieldChanges } = require('./auditService');
 
+// ------------------------------------------------------------------ //
+// FormEntries -> GtoInvoices bridge                                    //
+// Each manual form entry is a single, final meter reading. It lands   //
+// in GtoInvoices as one V1 row tagged DataSource='FormEntry' with a    //
+// DIRECT (pass-through) formula so the calc engine echoes it straight  //
+// into UlpureData without applying meter-delta math.                   //
+// ------------------------------------------------------------------ //
+const resolveSiteId = (siteName) => {
+  if (!siteName) return null;
+  const row = db.prepare('SELECT Id FROM Sites WHERE SiteName = ?').get(siteName);
+  return row ? row.Id : null;
+};
+
+const resolveUtilityId = (utilityName) => {
+  if (!utilityName) return null;
+  const row = db
+    .prepare('SELECT Id FROM UtilityTypes WHERE UtilityName = ?')
+    .get(utilityName);
+  return row ? row.Id : null;
+};
+
+const syncFormEntryToGtoInvoices = (formEntry) => {
+  if (!formEntry) return;
+
+  const utilityName = formEntry.UtilityName || formEntry.UtilityCode || '';
+  const siteId = resolveSiteId(formEntry.SiteCode);
+  const utilityTypeId = resolveUtilityId(utilityName);
+  const consumption = Number(formEntry.Consumption) || 0;
+
+  // Remove any prior GtoInvoices row this form entry produced (e.g. if the
+  // month/utility changed on update) so re-syncing stays idempotent.
+  db.prepare(
+    "DELETE FROM GtoInvoices WHERE SourceEntryId = ? AND DataSource = 'FormEntry'"
+  ).run(formEntry.Id);
+
+  // INSERT OR REPLACE upserts against UX_GtoInvoices_source
+  // (SiteId, UtilityTypeId, ValueSlot, PostingDateMonth) so a manual entry
+  // overrides any existing row for the same site/utility/month.
+  db.prepare(`
+    INSERT OR REPLACE INTO GtoInvoices
+    (
+      SourceEntryId,
+      AccountNumber,
+      ValueSlot,
+      Consumption,
+      PostingDateMonth,
+      DataSource,
+      UtilityTypeId,
+      SiteId,
+      TemplateType,
+      Facility,
+      Units,
+      FormulaCode,
+      PdfFile
+    )
+    VALUES
+    (
+      @sourceEntryId,
+      @accountNumber,
+      'V1',
+      @consumption,
+      @postingMonth,
+      'FormEntry',
+      @utilityTypeId,
+      @siteId,
+      @templateType,
+      @facility,
+      @units,
+      'DIRECT',
+      @pdfFile
+    )
+  `).run({
+    sourceEntryId: formEntry.Id,
+    accountNumber:
+      formEntry.AccountMeterNo || formEntry.EntryName || utilityName || '',
+    consumption,
+    postingMonth: formEntry.PostingMonth || '',
+    utilityTypeId,
+    siteId,
+    templateType: utilityName,
+    facility: formEntry.FacilityCode || '',
+    units: formEntry.Units || '',
+    pdfFile: formEntry.FileUrl || '',
+  });
+};
+
 // Create Entry
 const insertFormEntry = (data) => {
   const entryNumber = `ENTRY-${Date.now()}`;
@@ -68,7 +154,11 @@ const insertFormEntry = (data) => {
     formValuesJson: data.formValuesJson || null,
   });
 
-  return db.prepare('SELECT * FROM FormEntries WHERE Id = ?').get(result.lastInsertRowid);
+  const created = db
+    .prepare('SELECT * FROM FormEntries WHERE Id = ?')
+    .get(result.lastInsertRowid);
+  syncFormEntryToGtoInvoices(created);
+  return created;
 };
 
 // Get All Entries
@@ -168,7 +258,9 @@ const updateFormEntry = (id, data) => {
     id
   );
 
-  return db.prepare('SELECT * FROM FormEntries WHERE Id = ?').get(id);
+  const updated = db.prepare('SELECT * FROM FormEntries WHERE Id = ?').get(id);
+  syncFormEntryToGtoInvoices(updated);
+  return updated;
 };
 
 module.exports = {
@@ -177,4 +269,5 @@ module.exports = {
   fetchFormEntryById,
   changeFormEntryStatus,
   updateFormEntry,
+  syncFormEntryToGtoInvoices,
 };

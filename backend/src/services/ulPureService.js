@@ -1,45 +1,93 @@
 const db = require('../config/db');
 const { logFieldChanges } = require('./auditService');
 
-// Insert into UL Pure table
+// Aliased column list: returns UlpureData rows using the legacy UlPureEntries
+// field names so existing controllers / frontend keep working unchanged.
+const UL_COLUMNS = `
+  Id,
+  SourceEntryId,
+  EntryNumber,
+  COALESCE(FacilityCode, Facility) AS FacilityCode,
+  COALESCE(SiteCode, Site) AS SiteCode,
+  Site,
+  Facility,
+  EntryName,
+  UtilityCode,
+  Utility AS UtilityName,
+  PostingDateMonth AS PostingMonth,
+  AccountMeterNo,
+  Units,
+  Consumption,
+  PreviousConsumptionUL,
+  UlpureStatus AS Status,
+  Comments AS Comment,
+  FileName,
+  FileUrl,
+  CreatedBy,
+  CreatedAt,
+  ModifiedBy,
+  ModifiedAt,
+  ReviewStatus,
+  ReviewedBy,
+  ReviewedAt,
+  FormulaCode,
+  DataSource
+`;
+
+// Resolve normalized FK ids from free-text names (null-tolerant).
+const siteIdStmt = db.prepare('SELECT Id FROM Sites WHERE SiteName = ?');
+const utilityIdStmt = db.prepare('SELECT Id FROM UtilityTypes WHERE UtilityName = ?');
+const resolveSiteId = (name) => (name ? siteIdStmt.get(name)?.Id ?? null : null);
+const resolveUtilityId = (name) => (name ? utilityIdStmt.get(name)?.Id ?? null : null);
+
+// Insert a manual (form-generated) row into UL Pure
 const insertUlPureEntryFromFormEntry = (formEntry) => {
   const existing = db
-    .prepare(
-      'SELECT * FROM UlPureEntries WHERE SourceEntryId = ?'
-    )
+    .prepare('SELECT * FROM UlpureData WHERE SourceEntryId = ?')
     .get(formEntry.Id);
 
   if (existing) {
     return existing;
   }
 
+  const utilityName = formEntry.UtilityName || formEntry.UtilityCode || '';
+
   const stmt = db.prepare(`
-    INSERT INTO UlPureEntries (
+    INSERT INTO UlpureData (
       SourceEntryId,
       EntryNumber,
       FacilityCode,
       SiteCode,
+      Site,
+      Facility,
       EntryName,
       UtilityCode,
-      UtilityName,
-      PostingMonth,
+      UtilityTypeId,
+      SiteId,
+      Utility,
+      PostingDateMonth,
       AccountMeterNo,
       Units,
       Consumption,
-      Status,
-      Comment,
+      UlpureStatus,
+      Comments,
       FileName,
       FileUrl,
-      CreatedBy
+      CreatedBy,
+      DataSource
     )
     VALUES (
       @sourceEntryId,
       @entryNumber,
       @facilityCode,
       @siteCode,
+      @site,
+      @facility,
       @entryName,
       @utilityCode,
-      @utilityName,
+      @utilityTypeId,
+      @siteId,
+      @utility,
       @postingMonth,
       @accountMeterNo,
       @units,
@@ -48,7 +96,8 @@ const insertUlPureEntryFromFormEntry = (formEntry) => {
       @comment,
       @fileName,
       @fileUrl,
-      @createdBy
+      @createdBy,
+      'Manual'
     )
   `);
 
@@ -57,14 +106,17 @@ const insertUlPureEntryFromFormEntry = (formEntry) => {
     entryNumber: formEntry.EntryNumber || '',
     facilityCode: formEntry.FacilityCode || '',
     siteCode: formEntry.SiteCode || '',
+    site: formEntry.SiteCode || '',
+    facility: formEntry.FacilityCode || '',
     entryName: formEntry.EntryName || '',
     utilityCode: formEntry.UtilityCode || '',
-    utilityName:
-      formEntry.UtilityName || formEntry.UtilityCode || '',
+    utilityTypeId: resolveUtilityId(utilityName),
+    siteId: resolveSiteId(formEntry.SiteCode),
+    utility: utilityName,
     postingMonth: formEntry.PostingMonth || '',
     accountMeterNo: formEntry.AccountMeterNo || '',
     units: formEntry.Units || '',
-    consumption: formEntry.Consumption || '',
+    consumption: formEntry.Consumption || 0,
     status: 'Validate', // <-- BLUE STATUS
     comment: formEntry.Comment || '',
     fileName: formEntry.FileName || '',
@@ -73,7 +125,7 @@ const insertUlPureEntryFromFormEntry = (formEntry) => {
   });
 
   return db
-    .prepare('SELECT * FROM UlPureEntries WHERE Id = ?')
+    .prepare('SELECT * FROM UlpureData WHERE Id = ?')
     .get(result.lastInsertRowid);
 };
 
@@ -106,7 +158,7 @@ const moveModifiedValidatedEntriesToUlPure = ({
   for (const entry of entries) {
     const existing = db
       .prepare(
-        'SELECT * FROM UlPureEntries WHERE SourceEntryId = ?'
+        'SELECT * FROM UlpureData WHERE SourceEntryId = ?'
       )
       .get(entry.Id);
 
@@ -129,7 +181,7 @@ const moveModifiedValidatedEntriesToUlPure = ({
 const fetchUlPureEntries = () => {
   return db
     .prepare(
-      'SELECT * FROM UlPureEntries ORDER BY Id DESC'
+      `SELECT ${UL_COLUMNS} FROM UlpureData ORDER BY Id DESC`
     )
     .all();
 };
@@ -140,7 +192,7 @@ const fetchUlPureEntries = () => {
 const fetchUlPureEntryById = (id) => {
   return db
     .prepare(
-      'SELECT * FROM UlPureEntries WHERE Id = ?'
+      `SELECT ${UL_COLUMNS} FROM UlpureData WHERE Id = ?`
     )
     .get(id);
 };
@@ -149,7 +201,7 @@ const fetchUlPureEntryById = (id) => {
 
 // Save from UL Pure Details page
 const updateUlPureEntry = (id, data) => {
-  const entry = db.prepare('SELECT * FROM UlPureEntries WHERE Id = ?').get(id);
+  const entry = fetchUlPureEntryById(id);
 
   if (!entry) {
     throw new Error('UL Pure entry not found');
@@ -165,7 +217,7 @@ const updateUlPureEntry = (id, data) => {
   };
 
   logFieldChanges({
-    tableName: 'UlPureEntries',
+    tableName: 'UlpureData',
     recordId: id,
     oldRecord: entry,
     newFields: newValues,
@@ -173,12 +225,12 @@ const updateUlPureEntry = (id, data) => {
   });
 
   db.prepare(`
-    UPDATE UlPureEntries
+    UPDATE UlpureData
     SET
-      PostingMonth = ?,
+      PostingDateMonth = ?,
       Consumption = ?,
-      Comment = ?,
-      Status = ?,
+      Comments = ?,
+      UlpureStatus = ?,
       ModifiedBy = ?,
       ModifiedAt = datetime('now')
     WHERE Id = ?
@@ -191,30 +243,30 @@ const updateUlPureEntry = (id, data) => {
     id
   );
 
-  return db.prepare('SELECT * FROM UlPureEntries WHERE Id = ?').get(id);
+  return fetchUlPureEntryById(id);
 };
 
 const markUlPureReviewed = (id, reviewedBy) => {
-  const entry = db.prepare('SELECT * FROM UlPureEntries WHERE Id = ?').get(id);
+  const entry = db.prepare('SELECT Id FROM UlpureData WHERE Id = ?').get(id);
   if (!entry) throw new Error('UL Pure entry not found');
 
   db.prepare(`
-    UPDATE UlPureEntries
+    UPDATE UlpureData
     SET ReviewStatus = 'Reviewed',
         ReviewedBy = ?,
         ReviewedAt = datetime('now')
     WHERE Id = ?
   `).run(reviewedBy || 'Unknown User', id);
 
-  return db.prepare('SELECT * FROM UlPureEntries WHERE Id = ?').get(id);
+  return fetchUlPureEntryById(id);
 };
 
 
-// Clear table
+// Clear table (manual rows only; calculated rows are managed by the calc engine)
 const clearUlPureEntries = () => {
 
   db.prepare(
-    'DELETE FROM UlPureEntries'
+    "DELETE FROM UlpureData WHERE DataSource = 'Manual'"
   ).run();
 
   return {

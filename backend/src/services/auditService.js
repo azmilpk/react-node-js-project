@@ -32,11 +32,11 @@ const logFieldChanges = ({ tableName, recordId, oldRecord, newFields, changedBy 
 };
 const fetchCombinedUlPureHistory = (ulPureId) => {
   const entry = db
-    .prepare('SELECT SourceEntryId FROM UlPureEntries WHERE Id = ?')
+    .prepare('SELECT SourceEntryId FROM UlpureData WHERE Id = ?')
     .get(ulPureId);
 
   const ulPureLogs = db
-    .prepare(`SELECT * FROM AuditLog WHERE TableName = 'UlPureEntries' AND RecordId = ?`)
+    .prepare(`SELECT * FROM AuditLog WHERE TableName IN ('UlpureData', 'UlPureEntries') AND RecordId = ?`)
     .all(ulPureId);
 
   let formLogs = [];
@@ -51,7 +51,7 @@ const fetchCombinedUlPureHistory = (ulPureId) => {
   );
 };
 const fetchAuditHistory = (tableName, recordId) => {
-  if (tableName === 'UlPureEntries') {
+  if (tableName === 'UlPureEntries' || tableName === 'UlpureData') {
     return fetchCombinedUlPureHistory(recordId);
   }
   return db

@@ -25,30 +25,6 @@ db.exec(`
 `);
 
 db.exec(`
-  CREATE TABLE IF NOT EXISTS UlPureEntries (
-    Id INTEGER PRIMARY KEY AUTOINCREMENT,
-    SourceEntryId INTEGER,
-    EntryNumber TEXT,
-    FacilityCode TEXT,
-    SiteCode TEXT,
-    EntryName TEXT,
-    UtilityCode TEXT,
-    UtilityName TEXT,
-    PostingMonth TEXT,
-    AccountMeterNo TEXT,
-    Units TEXT,
-    Consumption REAL,
-    Status TEXT NOT NULL DEFAULT 'Validated',
-    Comment TEXT,
-    FileName TEXT,
-    FileUrl TEXT,
-    CreatedBy TEXT,
-    CreatedAt TEXT NOT NULL DEFAULT (datetime('now')),
-    ModifiedBy TEXT,
-    ModifiedAt TEXT
-  );
-`);
-db.exec(`
   CREATE TABLE IF NOT EXISTS AuditLog (
     Id INTEGER PRIMARY KEY AUTOINCREMENT,
     TableName TEXT NOT NULL,
@@ -81,15 +57,135 @@ ensureColumn('FormEntries', 'FormValuesJson', 'TEXT');
 ensureColumn('FormEntries', 'EntryName', 'TEXT');
 ensureColumn('FormEntries', 'ModifiedAt', 'TEXT');
 
-ensureColumn('UlPureEntries', 'FacilityCode', 'TEXT');
-ensureColumn('UlPureEntries', 'UtilityName', 'TEXT');
-ensureColumn('UlPureEntries', 'Comment', 'TEXT');
-ensureColumn('UlPureEntries', 'ModifiedBy', 'TEXT');
-ensureColumn('UlPureEntries', 'ModifiedAt', 'TEXT');
-ensureColumn('UlPureEntries', 'EntryName', 'TEXT');
+/* ------------------------------------------------------------------ *
+ * Improved schema (Path B): normalized lookups + typed raw/clean data
+ * Added alongside the legacy tables so the running app is unaffected.
+ * ------------------------------------------------------------------ */
 
-ensureColumn('UlPureEntries', 'ReviewStatus', "TEXT DEFAULT 'Not Reviewed'");
-ensureColumn('UlPureEntries', 'ReviewedBy', 'TEXT');
-ensureColumn('UlPureEntries', 'ReviewedAt', 'TEXT');
+// Lookup: utility types (kills free-text "Electricity"/"electricity" drift)
+db.exec(`
+  CREATE TABLE IF NOT EXISTS UtilityTypes (
+    Id INTEGER PRIMARY KEY AUTOINCREMENT,
+    UtilityName TEXT NOT NULL UNIQUE
+  );
+`);
+
+// Lookup: sites (kills the Köping / KOP duplication)
+db.exec(`
+  CREATE TABLE IF NOT EXISTS Sites (
+    Id INTEGER PRIMARY KEY AUTOINCREMENT,
+    SiteName TEXT NOT NULL UNIQUE
+  );
+`);
+
+// Raw landing table (improved Gto_Invoices): typed numbers, ValueSlot, FKs
+db.exec(`
+  CREATE TABLE IF NOT EXISTS GtoInvoices (
+    Id INTEGER PRIMARY KEY AUTOINCREMENT,
+    AccountNumber TEXT,
+    ValueSlot TEXT,
+    Consumption REAL,
+    PreviousConsumption REAL,
+    FreshWaterStaticValue REAL,
+    EvaporationFactorValue REAL,
+    ConstantValue REAL,
+    InvoiceDate TEXT,
+    PostingDateMonth TEXT,
+    Hitl TEXT,
+    BotStatus TEXT,
+    DataSource TEXT,
+    UtilityTypeId INTEGER REFERENCES UtilityTypes(Id),
+    SiteId INTEGER REFERENCES Sites(Id),
+    TemplateType TEXT,
+    Facility TEXT,
+    Units TEXT,
+    FormulaCode TEXT,
+    PdfFile TEXT,
+    InvoiceNo TEXT,
+    ValidateUser TEXT,
+    Approver TEXT,
+    Comments TEXT,
+    ValidatorLoginTime TEXT,
+    CreatedAt TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+`);
+
+// Clean / calculated table (improved tbl_ulpure_data)
+db.exec(`
+  CREATE TABLE IF NOT EXISTS UlpureData (
+    Id INTEGER PRIMARY KEY AUTOINCREMENT,
+    PostingDateMonth TEXT,
+    UtilityTypeId INTEGER REFERENCES UtilityTypes(Id),
+    SiteId INTEGER REFERENCES Sites(Id),
+    Utility TEXT,
+    Site TEXT,
+    Facility TEXT,
+    Consumption REAL,
+    PreviousConsumptionUL REAL,
+    Units TEXT,
+    UlpureStatus TEXT NOT NULL DEFAULT 'Validated',
+    FormulaCode TEXT,
+    Comments TEXT,
+    ComPerson TEXT,
+    CreatedAt TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+`);
+
+// Prevent double-importing the same source value for the same site/utility/month
+db.exec(`
+  CREATE UNIQUE INDEX IF NOT EXISTS UX_GtoInvoices_source
+  ON GtoInvoices (SiteId, UtilityTypeId, ValueSlot, PostingDateMonth);
+`);
+
+// Seed lookup tables (idempotent)
+const seedUtility = db.prepare(
+  'INSERT OR IGNORE INTO UtilityTypes (UtilityName) VALUES (?)'
+);
+[
+  'Electricity',
+  'District Heating',
+  'Water',
+  'Diesel',
+  'LPG',
+  'Propane',
+  'Gasoline',
+  'Natural Gas',
+  'Energy Consumption',
+  'Renewable Electricity',
+  'Produced Units',
+].forEach((name) => seedUtility.run(name));
+
+const seedSite = db.prepare('INSERT OR IGNORE INTO Sites (SiteName) VALUES (?)');
+['Köping', 'NRV', 'LVLC', 'Macungie', 'MEC', 'RT100'].forEach((name) =>
+  seedSite.run(name)
+);
+
+/* ------------------------------------------------------------------ *
+ * Make UlpureData able to fully stand in for UlPureEntries:
+ * file, meter, review, audit fields + source link + data-source tag.
+ * ------------------------------------------------------------------ */
+// Link GtoInvoices rows back to the form entry that produced them (manual flow)
+ensureColumn('GtoInvoices', 'SourceEntryId', 'INTEGER');
+// File
+ensureColumn('UlpureData', 'FileName', 'TEXT');
+ensureColumn('UlpureData', 'FileUrl', 'TEXT');
+// Meter / identity
+ensureColumn('UlpureData', 'EntryNumber', 'TEXT');
+ensureColumn('UlpureData', 'EntryName', 'TEXT');
+ensureColumn('UlpureData', 'AccountMeterNo', 'TEXT');
+ensureColumn('UlpureData', 'UtilityCode', 'TEXT');
+ensureColumn('UlpureData', 'FacilityCode', 'TEXT');
+ensureColumn('UlpureData', 'SiteCode', 'TEXT');
+// Review
+ensureColumn('UlpureData', 'ReviewStatus', "TEXT DEFAULT 'Not Reviewed'");
+ensureColumn('UlpureData', 'ReviewedBy', 'TEXT');
+ensureColumn('UlpureData', 'ReviewedAt', 'TEXT');
+// Audit
+ensureColumn('UlpureData', 'CreatedBy', 'TEXT');
+ensureColumn('UlpureData', 'ModifiedBy', 'TEXT');
+ensureColumn('UlpureData', 'ModifiedAt', 'TEXT');
+// Source link + producer discriminator ('Calculated' | 'Manual')
+ensureColumn('UlpureData', 'SourceEntryId', 'INTEGER');
+ensureColumn('UlpureData', 'DataSource', "TEXT DEFAULT 'Calculated'");
 
 console.log('Tables created successfully');
