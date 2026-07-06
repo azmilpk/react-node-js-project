@@ -1,7 +1,0 @@
-{
-  "dependencies": {
-    "@azure/storage-blob": "^12.32.0",
-    "better-sqlite3": "^12.10.0",
-    "multer": "^2.1.1"
-  }
-}
