@@ -3,31 +3,31 @@ const kopingUtilities = [
     utilityCode: 'electricity',
     utilityName: 'Electricity',
     iconKey: 'energy',
-    description: 'Enter electricity consumption data',
+    description: 'Initiate a new  Data entry. Add required details & additional documents.',
   },
   {
     utilityCode: 'diesel',
     utilityName: 'Diesel',
     iconKey: 'diesel',
-    description: 'Enter diesel consumption data',
+    description: 'Initiate a new  Data entry. Add required details & additional documents.',
   },
   {
     utilityCode: 'district-heating',
     utilityName: 'District Heating',
     iconKey: 'energy',
-    description: 'Enter district heating data',
+    description: 'Initiate a new  Data entry. Add required details & additional documents.',
   },
   {
     utilityCode: 'water',
     utilityName: 'Water',
     iconKey: 'water',
-    description: 'Enter water consumption data',
+    description: 'Initiate a new  Data entry. Add required details & additional documents.',
   },
   {
     utilityCode: 'lpg',
     utilityName: 'LPG',
     iconKey: 'fuel',
-    description: 'Enter LPG data',
+    description: 'Initiate a new  Data entry. Add required details & additional documents.',
   },
 ];
 
@@ -36,7 +36,7 @@ const nrvUtilities = [
     utilityCode: 'renewable-electricity',
     utilityName: 'Renewable Electricity',
     iconKey: 'energy',
-    description: 'Enter renewable electricity data',
+    description: 'Initiate a new  Data entry. Add required details & additional documents.',
   },
 ];
 
@@ -45,19 +45,19 @@ const lvlcUtilities = [
     utilityCode: 'energy-consumption',
     utilityName: 'Energy Consumption',
     iconKey: 'energy',
-    description: 'Enter energy consumption data',
+    description: 'Initiate a new  Data entry. Add required details & additional documents.',
   },
   {
     utilityCode: 'natural-gas',
     utilityName: 'Natural Gas',
     iconKey: 'fuel',
-    description: 'Enter natural gas data',
+    description: 'Initiate a new  Data entry. Add required details & additional documents.',
   },
   {
     utilityCode: 'propane',
     utilityName: 'Propane',
     iconKey: 'fuel',
-    description: 'Enter propane data',
+    description: 'Initiate a new  Data entry. Add required details & additional documents.',
   },
 ];
 
@@ -66,25 +66,25 @@ const macungieUtilities = [
     utilityCode: 'energy-consumption',
     utilityName: 'Energy Consumption',
     iconKey: 'energy',
-    description: 'Enter energy consumption data',
+    description: 'Initiate a new  Data entry. Add required details & additional documents.',
   },
   {
     utilityCode: 'natural-gas',
     utilityName: 'Natural Gas',
     iconKey: 'fuel',
-    description: 'Enter natural gas data',
+    description: 'Initiate a new  Data entry. Add required details & additional documents.',
   },
   {
     utilityCode: 'produced-units',
     utilityName: 'Produced Units',
     iconKey: 'producedUnits',
-    description: 'Enter produced units data',
+    description: 'Initiate a new  Data entry. Add required details & additional documents.',
   },
   {
     utilityCode: 'gasoline',
     utilityName: 'Gasoline',
     iconKey: 'fuel',
-    description: 'Enter gasoline data',
+    description: 'Initiate a new  Data entry. Add required details & additional documents.',
   },
 ];
 
@@ -93,31 +93,31 @@ const mecUtilities = [
     utilityCode: 'energy-consumption',
     utilityName: 'Energy Consumption',
     iconKey: 'energy',
-    description: 'Enter energy consumption data',
+    description: 'Initiate a new  Data entry. Add required details & additional documents.',
   },
   {
     utilityCode: 'propane',
     utilityName: 'Propane',
     iconKey: 'fuel',
-    description: 'Enter propane data',
+    description: 'Initiate a new  Data entry. Add required details & additional documents.',
   },
   {
     utilityCode: 'natural-gas',
     utilityName: 'Natural Gas',
     iconKey: 'fuel',
-    description: 'Enter natural gas data',
+    description: 'Initiate a new  Data entry. Add required details & additional documents.',
   },
   {
     utilityCode: 'diesel',
     utilityName: 'Diesel',
     iconKey: 'diesel',
-    description: 'Enter diesel data',
+    description: 'Initiate a new  Data entry. Add required details & additional documents.',
   },
   {
     utilityCode: 'water',
     utilityName: 'Water',
     iconKey: 'water',
-    description: 'Enter water data',
+    description: 'Initiate a new  Data entry. Add required details & additional documents.',
   },
 ];
 
@@ -126,19 +126,19 @@ const rt100Utilities = [
     utilityCode: 'energy-consumption',
     utilityName: 'Energy Consumption',
     iconKey: 'energy',
-    description: 'Enter energy consumption data',
+    description: 'Initiate a new  Data entry. Add required details & additional documents.',
   },
   {
     utilityCode: 'natural-gas',
     utilityName: 'Natural Gas',
     iconKey: 'fuel',
-    description: 'Enter natural gas data',
+    description: 'Initiate a new  Data entry. Add required details & additional documents.',
   },
   {
     utilityCode: 'water',
     utilityName: 'Water',
     iconKey: 'water',
-    description: 'Enter water data',
+    description: 'Initiate a new  Data entry. Add required details & additional documents.',
   },
 ];
 

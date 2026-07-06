@@ -31,7 +31,11 @@ const UL_COLUMNS = `
   ReviewedBy,
   ReviewedAt,
   FormulaCode,
-  DataSource
+  DataSource,
+  COALESCE(
+    (SELECT RegonId FROM Sites WHERE Sites.Id = UlpureData.SiteId),
+    (SELECT RegonId FROM Sites WHERE Sites.SiteName = UlpureData.Site)
+  ) AS RegonId
 `;
 
 // Resolve normalized FK ids from free-text names (null-tolerant).

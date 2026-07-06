@@ -26,8 +26,10 @@ function slotMap(siteId, utilityTypeId, month) {
 const FORMULAS = {
   Electricity({ cur }) {
     const v = (k) => num(cur[k]);
-    // (V1 + V5 − V2 − V3 − V4) / 1000
-    return { value: (v('V1') + v('V5') - v('V2') - v('V3') - v('V4')) / 1000, units: 'MWh', code: 'ELEC_STD' };
+    // V1 = total (A+T) electricity, already in MWh. V2/V3/V4 = charging-station
+    // meters (kWh) that are excluded; V5 = E-hallen meter (kWh) that is included.
+    // Convert the kWh meters to MWh, then combine with the MWh total.
+    return { value: v('V1') + (v('V5') - v('V2') - v('V3') - v('V4')) / 1000, units: 'MWh', code: 'ELEC_STD' };
   },
   'District Heating'({ cur, prev }) {
     const c = (k) => num(cur[k]);
@@ -46,9 +48,12 @@ const FORMULAS = {
     // NOTE: process water V15–V18 not yet included (pending your confirmation)
     return { value: mainDelta - coolingDelta, units: 'm3', code: 'WATER_NET' };
   },
-  LPG({ cur }) {
-    // Source value is already energy in kWh, so just convert kWh -> MWh.
-    return { value: num(cur['V1']) / 1000, units: 'MWh', code: 'LPG_STD' };
+     LPG({ cur }) {
+    // V1 = LPG mass in KG. 12900 kWh per tonne -> divide kg by 1000 for tonnes,
+    // then /1000 again to convert kWh -> MWh, i.e. * 12900 / 1_000_000.
+    // Rounded to 3 decimals (1680.2895 -> 1680.29).
+    const mwh = (num(cur['V1']) * 12900) / 1_000_000;
+    return { value: Math.round(mwh * 1000) / 1000, units: 'MWh', code: 'LPG_STD' };
   },
   Diesel({ cur }) {
     return { value: num(cur['V1']), units: 'L', code: 'DIESEL_STD' };
@@ -88,7 +93,16 @@ function calculateAll() {
     ORDER BY g.PostingDateMonth, s.SiteName, u.UtilityName
   `).all();
 
-  const insert = db.prepare(`
+  // Upsert on the natural key (site + utility + month) so a recalculated row
+  // keeps its Id — and therefore its audit history — instead of being deleted
+  // and re-inserted with a fresh Id every run.
+  const findCalcRow = db.prepare(`
+    SELECT Id FROM UlpureData
+    WHERE SiteId = ? AND UtilityTypeId = ? AND PostingDateMonth = ? AND DataSource = 'Calculated'
+    LIMIT 1
+  `);
+
+  const insertCalc = db.prepare(`
     INSERT INTO UlpureData
       (PostingDateMonth, UtilityTypeId, SiteId, Utility, Site,
        Consumption, PreviousConsumptionUL, Units, UlpureStatus, FormulaCode, DataSource)
@@ -96,10 +110,16 @@ function calculateAll() {
             @value, @previous, @units, 'Validated', @code, 'Calculated')
   `);
 
+  const updateCalc = db.prepare(`
+    UPDATE UlpureData
+    SET Utility = @utility, Site = @site, Consumption = @value,
+        Units = @units, FormulaCode = @code
+    WHERE Id = @id
+  `);
+
   const results = [];
   db.transaction(() => {
-    // Only recompute calculated rows; manual (form-generated) rows are left intact.
-    db.prepare("DELETE FROM UlpureData WHERE DataSource = 'Calculated'").run();
+    const keptIds = [];
     for (const c of combos) {
       const cur = slotMap(c.SiteId, c.UtilityTypeId, c.PostingDateMonth);
       const prev = slotMap(c.SiteId, c.UtilityTypeId, prevMonth(c.PostingDateMonth));
@@ -139,18 +159,47 @@ function calculateAll() {
         continue;
       }
 
-      insert.run({
-        month: c.PostingDateMonth,
-        utilityTypeId: c.UtilityTypeId,
-        siteId: c.SiteId,
-        utility: c.UtilityName,
-        site: c.SiteName,
-        value,
-        previous: null,
-        units,
-        code,
-      });
+      // Round every stored value to 3 decimals so results are consistent
+      // (e.g. LPG 1680.2895 -> 1680.29) instead of carrying float tails.
+      value = Math.round(value * 1000) / 1000;
+
+      const existing = findCalcRow.get(c.SiteId, c.UtilityTypeId, c.PostingDateMonth);
+      if (existing) {
+        updateCalc.run({
+          id: existing.Id,
+          utility: c.UtilityName,
+          site: c.SiteName,
+          value,
+          units,
+          code,
+        });
+        keptIds.push(existing.Id);
+      } else {
+        const res = insertCalc.run({
+          month: c.PostingDateMonth,
+          utilityTypeId: c.UtilityTypeId,
+          siteId: c.SiteId,
+          utility: c.UtilityName,
+          site: c.SiteName,
+          value,
+          previous: null,
+          units,
+          code,
+        });
+        keptIds.push(res.lastInsertRowid);
+      }
       results.push({ ...c, value, units });
+    }
+
+    // Prune calculated rows that no longer produced a value this run (e.g. a
+    // month that became skipped). Manual rows are never touched.
+    if (keptIds.length > 0) {
+      const placeholders = keptIds.map(() => '?').join(',');
+      db.prepare(
+        `DELETE FROM UlpureData WHERE DataSource = 'Calculated' AND Id NOT IN (${placeholders})`
+      ).run(...keptIds);
+    } else {
+      db.prepare("DELETE FROM UlpureData WHERE DataSource = 'Calculated'").run();
     }
   })();
 

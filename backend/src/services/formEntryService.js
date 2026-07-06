@@ -30,6 +30,17 @@ const syncFormEntryToGtoInvoices = (formEntry) => {
   const utilityTypeId = resolveUtilityId(utilityName);
   const consumption = Number(formEntry.Consumption) || 0;
 
+  // Utilities that must run through a meter formula instead of DIRECT passthrough.
+  const FORMULA_CODE_BY_UTILITY = {
+    Electricity: 'ELEC_STD',
+    'District Heating': 'DH_STD',
+    Water: 'WATER_NET',
+    LPG: 'LPG_STD',
+    Diesel: 'DIESEL_STD',
+    'Produced Units': 'PRODUCED_STD',
+  };
+  const formulaCode = FORMULA_CODE_BY_UTILITY[utilityName] || 'DIRECT';
+
   // Remove any prior GtoInvoices row this form entry produced (e.g. if the
   // month/utility changed on update) so re-syncing stays idempotent.
   db.prepare(
@@ -69,7 +80,7 @@ const syncFormEntryToGtoInvoices = (formEntry) => {
       @templateType,
       @facility,
       @units,
-      'DIRECT',
+      @formulaCode,
       @pdfFile
     )
   `).run({
@@ -83,6 +94,7 @@ const syncFormEntryToGtoInvoices = (formEntry) => {
     templateType: utilityName,
     facility: formEntry.FacilityCode || '',
     units: formEntry.Units || '',
+    formulaCode,
     pdfFile: formEntry.FileUrl || '',
   });
 };

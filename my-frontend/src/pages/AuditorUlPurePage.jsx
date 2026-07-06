@@ -51,7 +51,13 @@ function AuditorUlPurePage() {
             item.utilityCode ||
             '-',
           accountMeterNo: item.AccountMeterNo || item.accountMeterNo || '-',
-          consumption: item.Consumption || item.consumption || '-',
+          regonId: item.RegonId || item.regonId || '-',
+          consumption: (() => {
+            const raw = item.Consumption ?? item.consumption;
+            return raw !== null && raw !== undefined && raw !== ''
+              ? Number(raw).toFixed(3)
+              : '-';
+          })(),
           units: item.Units || item.units || unitForUtility(item.UtilityName || item.utilityName || item.UtilityCode || item.utilityCode),
           postingMonth: item.PostingMonth || item.postingMonth || '-',
           status: item.Status || item.status || 'Validate',
@@ -92,7 +98,8 @@ function AuditorUlPurePage() {
   ].sort();
 
   const totalConsumption = filteredData.reduce((sum, row) => {
-    return sum + Number(row.consumption || 0);
+    const n = Number(row.consumption);
+    return sum + (Number.isFinite(n) ? n : 0);
   }, 0);
 
   const handleResetFilters = () => {
@@ -256,7 +263,7 @@ function AuditorUlPurePage() {
                         <td className="px-4 py-4 text-[13px] text-black">{row.site}</td>
                         <td className="px-4 py-4 text-[13px] text-black">{row.consumption}</td>
                         <td className="px-4 py-4 text-[13px] text-black">{row.units}</td>
-                        <td className="px-4 py-4 text-[13px] text-black">{row.accountMeterNo}</td>
+                        <td className="px-4 py-4 text-[13px] text-black">{row.regonId}</td>
                         <td className="px-4 py-4 text-[13px] text-black">{row.utility}</td>
                         <td className="px-4 py-4 text-[13px] text-black">{row.entryNumber}</td>
                         <td className="px-4 py-4 text-[13px] text-black">{row.postingMonth}</td>
@@ -284,7 +291,7 @@ function AuditorUlPurePage() {
 
             <div className="flex justify-between items-center px-4 py-4 border-t border-black/10">
               <div className="text-[14px] font-semibold text-black">
-                Total Consumption : {totalConsumption}
+                Total Consumption : {totalConsumption.toFixed(3)}
               </div>
             </div>
           </div>

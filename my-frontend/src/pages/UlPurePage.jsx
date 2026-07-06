@@ -63,8 +63,14 @@ function UlPurePage() {
             item.utilityCode ||
             '-',
           accountMeterNo: item.AccountMeterNo || item.accountMeterNo || '-',
-          consumption: item.Consumption || item.consumption || '-',
+          consumption: (() => {
+            const raw = item.Consumption ?? item.consumption;
+            return raw !== null && raw !== undefined && raw !== ''
+              ? Number(raw).toFixed(3)
+              : '-';
+          })(),
           units: item.Units || item.units || unitForUtility(item.Utility || item.utility),
+          regonId: item.RegonId || item.regonId || '-',
           postingMonth: item.PostingMonth || item.postingMonth || '-',
           status: item.Status || item.status || 'Validate',
           fileName: item.FileName || item.fileName || 'No file uploaded',
@@ -116,7 +122,8 @@ function UlPurePage() {
   ].sort();
 
   const totalConsumption = filteredData.reduce((sum, row) => {
-    return sum + Number(row.consumption || 0);
+    const n = Number(row.consumption);
+    return sum + (Number.isFinite(n) ? n : 0);
   }, 0);
 
   const handleViewDetails = (row) => {
@@ -263,10 +270,10 @@ function UlPurePage() {
                     filteredData.map((row) => (
                       <tr key={row.id} className="border-b border-black/10 hover:bg-black/5">
                         <td className="px-4 py-4 text-[13px] text-black">{row.utility}</td>
-                        <td className="px-4 py-4 text-[13px] text-black">{row.entry || row.site}</td>
+                        <td className="px-4 py-4 text-[13px] text-black">{row.site}</td>
                         <td className="px-4 py-4 text-[13px] text-black">{row.consumption}</td>
                         <td className="px-4 py-4 text-[13px] text-black">{row.units}</td>
-                        <td className="px-4 py-4 text-[13px] text-black">{row.accountMeterNo}</td>
+                        <td className="px-4 py-4 text-[13px] text-black">{row.regonId}</td>
                         <td className="px-4 py-4 text-[13px] text-black">{row.utility}</td>
                         <td className="px-4 py-4 text-[13px] text-black">{row.entryNumber}</td>
                         <td className="px-4 py-4 text-[13px] text-black">{row.postingMonth}</td>
@@ -309,7 +316,7 @@ function UlPurePage() {
 
             <div className="flex justify-between items-center px-4 py-4 border-t border-black/10">
               <div className="text-[14px] font-semibold text-black">
-                Total Consumption : {totalConsumption}
+                Total Consumption : {totalConsumption.toFixed(3)}
               </div>
 
               <button

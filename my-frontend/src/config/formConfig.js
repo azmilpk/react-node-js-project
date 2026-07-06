@@ -118,8 +118,8 @@ const kopingForms = {
         label: 'Account Number / Meter No',
         type: 'select',
         required: true,
-        options: ['Elektriciteit_billadaplaser_kwh'],
-        defaultValue: 'Elektriciteit_billadaplaser_kwh',
+        options: ['Elektriciteit_billadaplaser_kWh','Elektricitet_publik lastbilsladdare_(E)_kWh'],
+        defaultValue: 'Elektriciteit_billadaplaser_kWh',
       },
       
       {
@@ -263,8 +263,9 @@ const kopingForms = {
         label: 'Account Number / Meter No',
         type: 'select',
         required: true,
-        options: ['Huvudmätare_1_MWh'],
-        defaultValue: 'Huvudmätare_1_MWh',
+        options: ['Huvudmätare_T_MWh','Omk.rum_mätare_T_(nya mätaren_MWh)','Härdverk_T_MWh',
+          '85148787_MWh','Graddagsfaktor_Köping_SMHI','Kompressor_återvinning _VS 3_MWh'],
+        defaultValue: 'Huvudmätare_T_MWh',
       },
       
       {
@@ -336,7 +337,8 @@ const kopingForms = {
         label: 'Account Number / Meter No',
         type: 'select',
         required: true,
-        options: ['12812696_A_verkstad'],
+        options: ['12812696_A_verkstad','12812699_A_verkstad','12812698_A_verkstad','68511391_T_verkstad',
+          '6919964_Kyltorn_T-härd','6794762_Kyltorn_A-härd-borttagen','78102820_nödkyla_ugn_6_KB02','6 KB01'],
         defaultValue: '12812696_A_verkstad',
       },
       {
@@ -443,7 +445,7 @@ const nrvForms = {
         label: 'Utility',
         type: 'text',
         required: true,
-        defaultValue: 'LPG',
+        defaultValue: 'Renewable Electricity',
       },
       
       {
@@ -465,7 +467,7 @@ const nrvForms = {
         name: 'accountMeterNo',
         label: 'Account Number / Meter No',
         type: 'select',
-        options: ['Solar PV array 75'],
+        options: ['Solar PV array 75','Solar PV array 6'],
         required: true,
         defaultValue: 'Solar PV array 75',
       },

@@ -117,9 +117,10 @@ function ValidatePage() {
     });
   }, [tableData, selectedSite, utilityFilter, monthFilter, yearFilter, statusFilter]);
 
-  const totalConsumption = filteredData.reduce((sum, row) => {
-    return sum + Number(row.consumption || 0);
-  }, 0);
+ const totalConsumption = filteredData.reduce((sum, row) => {
+  const value = Number(row.consumption);
+  return sum + (Number.isFinite(value) ? value : 0);
+}, 0);
 
   const handleReset = () => {
     setUtilityFilter('');

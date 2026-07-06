@@ -160,6 +160,13 @@ const seedSite = db.prepare('INSERT OR IGNORE INTO Sites (SiteName) VALUES (?)')
   seedSite.run(name)
 );
 
+// Region (Regon) id per site — feeds the UL Pure report's "Regon Id" column.
+ensureColumn('Sites', 'RegonId', 'TEXT');
+const setRegonId = db.prepare(
+  "UPDATE Sites SET RegonId = ? WHERE SiteName = ? AND (RegonId IS NULL OR RegonId = '')"
+);
+setRegonId.run('64854062', 'Köping');
+
 /* ------------------------------------------------------------------ *
  * Make UlpureData able to fully stand in for UlPureEntries:
  * file, meter, review, audit fields + source link + data-source tag.
