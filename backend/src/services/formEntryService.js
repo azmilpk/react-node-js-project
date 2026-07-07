@@ -41,6 +41,44 @@ const syncFormEntryToGtoInvoices = (formEntry) => {
   };
   const formulaCode = FORMULA_CODE_BY_UTILITY[utilityName] || 'DIRECT';
 
+  // Account/meter name -> ValueSlot used by the calc formulas. Must stay in
+  // sync with ACCOUNT_VALUE_SLOT in scripts/importGtoInvoices.js. Single-value
+  // utilities (LPG/Diesel/Produced Units) have no meter picker, so they fall
+  // back to 'V1', which is the slot their formulas read.
+  const ACCOUNT_VALUE_SLOT = {
+    // Electricity
+    'Elektricitet, totalt A+T kWh': 'V1',
+    'Elektricitet_billaddplatser_kWh': 'V2',
+    'Elektricitet, publik lastbilsladdare (T3) kWh': 'V3',
+    'Elektricitet_publik lastbilsladdare_(E)_kWh': 'V4',
+    'Elförbruk E-hallen kWh': 'V5',
+    // District Heating
+    'Huvudmätare_T_MWh': 'V1',
+    'Omk.rum_mätare_T_(nya mätaren_MWh)': 'V2',
+    'Kompressor_återvinning _VS 3_MWh': 'V3',
+    'Härdverk_T_MWh': 'V4',
+    '85148787_MWh': 'V5',
+    'Graddagsfaktor_Köping_SMHI': 'V6',
+    'Verklig_Energi_Patrik': 'V13',
+    // Water
+    '12812696_A_verkstad': 'V1',
+    '12812699_A_verkstad': 'V2',
+    '12812698_A_verkstad': 'V3',
+    '68511391_T_verkstad': 'V4',
+    '6919964_Kyltorn_T-härd': 'V9',
+    '6794762_Kyltorn_A-härd-borttagen': 'V10',
+    '78102820_nödkyla_ugn_6_KB02': 'V11',
+    '6 KB01': 'V12',
+    'GKN_Water': 'V15',
+    'Stena_Fosfateringsvatten': 'V16',
+    'Stena_Emulsioner': 'V17',
+    'E-hallen_förbrukning_m3': 'V18',
+    // single-value utilities
+    'LPG_Propane_Gasoline': 'V1',
+    'Produced Units': 'V1',
+  };
+  const valueSlot = ACCOUNT_VALUE_SLOT[formEntry.AccountMeterNo] || 'V1';
+
   // Remove any prior GtoInvoices row this form entry produced (e.g. if the
   // month/utility changed on update) so re-syncing stays idempotent.
   db.prepare(
@@ -71,7 +109,7 @@ const syncFormEntryToGtoInvoices = (formEntry) => {
     (
       @sourceEntryId,
       @accountNumber,
-      'V1',
+      @valueSlot,
       @consumption,
       @postingMonth,
       'FormEntry',
@@ -87,6 +125,7 @@ const syncFormEntryToGtoInvoices = (formEntry) => {
     sourceEntryId: formEntry.Id,
     accountNumber:
       formEntry.AccountMeterNo || formEntry.EntryName || utilityName || '',
+    valueSlot,
     consumption,
     postingMonth: formEntry.PostingMonth || '',
     utilityTypeId,

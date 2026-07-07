@@ -168,7 +168,7 @@ const getAuthUser = () => {
 
                       <tr className="border-b border-black/10">
                         <td className="px-4 py-3 text-[13px] font-semibold text-black bg-[#f8f8f8]">
-                          Subsite
+                          Site
                         </td>
                         <td className="px-4 py-3 text-[13px] text-black">
                           {subsiteValue}

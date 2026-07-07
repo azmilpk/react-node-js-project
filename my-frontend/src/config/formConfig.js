@@ -118,8 +118,8 @@ const kopingForms = {
         label: 'Account Number / Meter No',
         type: 'select',
         required: true,
-        options: ['Elektriciteit_billadaplaser_kWh','Elektricitet_publik lastbilsladdare_(E)_kWh'],
-        defaultValue: 'Elektriciteit_billadaplaser_kWh',
+        options: ['Elektricitet_billaddplatser_kWh','Elektricitet_publik lastbilsladdare_(E)_kWh'],
+        defaultValue: 'Elektricitet_billaddplatser_kWh',
       },
       
       {

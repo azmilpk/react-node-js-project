@@ -31,6 +31,8 @@ const UL_COLUMNS = `
   ReviewedBy,
   ReviewedAt,
   FormulaCode,
+  IndicatorName,
+  IndicatorId,
   DataSource,
   COALESCE(
     (SELECT RegonId FROM Sites WHERE Sites.Id = UlpureData.SiteId),

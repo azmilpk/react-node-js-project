@@ -63,6 +63,8 @@ function UlPurePage() {
             item.utilityCode ||
             '-',
           accountMeterNo: item.AccountMeterNo || item.accountMeterNo || '-',
+          indicatorName: item.IndicatorName || item.indicatorName || '',
+          indicatorId: item.IndicatorId || item.indicatorId || '-',
           consumption: (() => {
             const raw = item.Consumption ?? item.consumption;
             return raw !== null && raw !== undefined && raw !== ''
@@ -88,21 +90,46 @@ function UlPurePage() {
   };
 
   const filteredData = useMemo(() => {
-    return tableData.filter((row) => {
-      const [year, month] = (row.postingMonth || '').split('-');
+    // Logical order for the five Water indicators so they appear grouped, top-to-bottom.
+    const WATER_ORDER = [
+      'City water, Water use in process excluded cooling',
+      'City water, Cooling of process',
+      'Water used in process',
+      'Domestic water use',
+      'Water Discharge',
+    ];
+    const waterRank = (name) => {
+      const i = WATER_ORDER.indexOf(name);
+      return i === -1 ? 99 : i;
+    };
 
-      const normalizedSelectedSite = (selectedSiteFromNav || '').trim().toLowerCase();
-      const rowSite = (row.site || '').trim().toLowerCase();
+    return tableData
+      .filter((row) => {
+        const [year, month] = (row.postingMonth || '').split('-');
 
-      const matchSite =
-        !selectedSiteFromNav || rowSite === normalizedSelectedSite;
+        const normalizedSelectedSite = (selectedSiteFromNav || '').trim().toLowerCase();
+        const rowSite = (row.site || '').trim().toLowerCase();
 
-      const matchUtility = !utilityFilter || row.utility === utilityFilter;
-      const matchMonth = !monthFilter || month === monthFilter;
-      const matchYear = !yearFilter || year === yearFilter;
+        const matchSite =
+          !selectedSiteFromNav || rowSite === normalizedSelectedSite;
 
-      return matchSite && matchUtility && matchMonth && matchYear;
-    });
+        const matchUtility = !utilityFilter || row.utility === utilityFilter;
+        const matchMonth = !monthFilter || month === monthFilter;
+        const matchYear = !yearFilter || year === yearFilter;
+
+        return matchSite && matchUtility && matchMonth && matchYear;
+      })
+      .sort((a, b) => {
+        // Group rows by site, then month, then utility.
+        const siteCmp = (a.site || '').localeCompare(b.site || '');
+        if (siteCmp !== 0) return siteCmp;
+        const monthCmp = (a.postingMonth || '').localeCompare(b.postingMonth || '');
+        if (monthCmp !== 0) return monthCmp;
+        const utilCmp = (a.utility || '').localeCompare(b.utility || '');
+        if (utilCmp !== 0) return utilCmp;
+        // Within Water, keep the five indicators in their logical sequence.
+        return waterRank(a.indicatorName) - waterRank(b.indicatorName);
+      });
   }, [
     tableData,
     selectedSiteFromNav,
@@ -274,8 +301,8 @@ function UlPurePage() {
                         <td className="px-4 py-4 text-[13px] text-black">{row.consumption}</td>
                         <td className="px-4 py-4 text-[13px] text-black">{row.units}</td>
                         <td className="px-4 py-4 text-[13px] text-black">{row.regonId}</td>
-                        <td className="px-4 py-4 text-[13px] text-black">{row.utility}</td>
-                        <td className="px-4 py-4 text-[13px] text-black">{row.entryNumber}</td>
+                        <td className="px-4 py-4 text-[13px] text-black">{row.indicatorName || row.utility}</td>
+                        <td className="px-4 py-4 text-[13px] text-black">{row.indicatorId}</td>
                         <td className="px-4 py-4 text-[13px] text-black">{row.postingMonth}</td>
                         <td className="px-4 py-4">
  <button

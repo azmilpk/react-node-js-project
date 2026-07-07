@@ -194,5 +194,7 @@ ensureColumn('UlpureData', 'ModifiedAt', 'TEXT');
 // Source link + producer discriminator ('Calculated' | 'Manual')
 ensureColumn('UlpureData', 'SourceEntryId', 'INTEGER');
 ensureColumn('UlpureData', 'DataSource', "TEXT DEFAULT 'Calculated'");
+ensureColumn('UlpureData', 'IndicatorName', 'TEXT');
+ensureColumn('UlpureData', 'IndicatorId', 'TEXT');
 
 console.log('Tables created successfully');
