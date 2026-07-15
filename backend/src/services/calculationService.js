@@ -38,8 +38,13 @@ const FORMULAS = {
     const V11 = c('V5') - p('V5');                                  // 85148787 delta
     const V12 = (c('V1') - p('V1')) + (c('V2') - p('V2')) + (c('V4') - p('V4'));
     const V13 = c('V13');                                           // E-hallen (Verklig_Energi)
-    // NOTE: V3 (Kompressor) and V6 (degree-day factor) intentionally excluded
-    return { value: V11 + V12 + V13, units: 'MWh', code: 'DH_STD' };
+    // NOTE: V3 (Kompressor) and V6 (degree-day factor) excluded from the purchased-heat total.
+    // Value 9 = compressor heat-recovery delta (V3) is reported separately as recovered energy.
+    const recoveredEnergy = c('V3') - p('V3');
+    return [
+      { indicator: 'Purchased heat/steam - Heating / Cooling', value: V11 + V12 + V13, units: 'MWh', code: 'DH_STD' },
+      { indicator: 'Recovered or converted energy', value: recoveredEnergy, units: 'MWh', code: 'RECOVERED_ENERGY', utility: 'Recovered or converted energy' },
+    ];
   },
   Water({ cur, prev }) {
     const c = (k) => num(cur[k]);
@@ -106,6 +111,7 @@ const DELTA_UTILITIES = new Set(['District Heating', 'Water']);
 const INDICATOR_META = {
   ELEC_STD:     { id: '64885465', name: 'Purchased electricity - Process', units: 'MWh' },
   DH_STD:       { id: '64885478', name: 'Purchased heat/steam - Heating / Cooling', units: 'MWh' },
+  RECOVERED_ENERGY: { id: '64885489', name: 'Recovered or converted energy', units: 'MWh' },
   WATER_NET:    { id: '64886067', name: 'City water, Water use in process excluded cooling', units: 'cubic meters' },
   WATER_COOL:   { id: '64886068', name: 'City water, Cooling of process', units: 'cubic meters' },
   WATER_PROC:   { id: '64886067', name: 'Water used in process', units: 'cubic meters' },
@@ -156,7 +162,7 @@ function calculateAll() {
       (PostingDateMonth, UtilityTypeId, SiteId, Utility, Site,
        Consumption, PreviousConsumptionUL, Units, UlpureStatus, FormulaCode, IndicatorName, IndicatorId, DataSource)
     VALUES (@month, @utilityTypeId, @siteId, @utility, @site,
-            @value, @previous, @units, 'Validated', @code, @indicator, @indicatorId, 'Calculated')
+            @value, @previous, @units, 'Validate', @code, @indicator, @indicatorId, 'Calculated')
   `);
 
   const updateCalc = db.prepare(`
@@ -167,9 +173,19 @@ function calculateAll() {
   `);
 
   const results = [];
+  const dieselType = db
+    .prepare("SELECT Id FROM UtilityTypes WHERE UtilityName = 'Diesel'")
+    .get();
   db.transaction(() => {
     const keptIds = [];
+    // Track which site+month combos produced output so we can guarantee a
+    // Diesel line (actual value or 0) for each of them below.
+    const emittedSiteMonths = new Map(); // `${SiteId}|${month}` -> SiteName
     for (const c of combos) {
+      // Diesel is handled entirely by the guaranteed-row pass after this loop
+      // (a single row per site+month using its actual V1 value, or 0 when there
+      // is no data), so skip it here to avoid producing a duplicate Diesel row.
+      if (c.UtilityName === 'Diesel') continue;
       const cur = slotMap(c.SiteId, c.UtilityTypeId, c.PostingDateMonth);
       const prev = slotMap(c.SiteId, c.UtilityTypeId, prevMonth(c.PostingDateMonth));
 
@@ -238,7 +254,7 @@ function calculateAll() {
           }
           updateCalc.run({
             id: existing.Id,
-            utility: c.UtilityName,
+            utility: o.utility || c.UtilityName,
             site: c.SiteName,
             value,
             units,
@@ -252,7 +268,7 @@ function calculateAll() {
             month: c.PostingDateMonth,
             utilityTypeId: c.UtilityTypeId,
             siteId: c.SiteId,
-            utility: c.UtilityName,
+            utility: o.utility || c.UtilityName,
             site: c.SiteName,
             value,
             previous: null,
@@ -264,6 +280,68 @@ function calculateAll() {
           keptIds.push(res.lastInsertRowid);
         }
         results.push({ ...c, indicator: indicatorName, value, units });
+        emittedSiteMonths.set(`${c.SiteId}|${c.PostingDateMonth}`, c.SiteName);
+      }
+    }
+
+    // Diesel has no meter formula. Guarantee exactly one Diesel indicator row
+    // per site+month, showing its actual V1 value when data exists (e.g. an
+    // entered/imported value) and 0 otherwise.
+    if (dieselType) {
+      const meta = INDICATOR_META.DIESEL_STD;
+      // Targets: every site+month that produced output, plus any month that
+      // actually has Diesel source data (so an entered value still shows).
+      const dieselTargets = new Map(emittedSiteMonths);
+      for (const c of combos) {
+        if (c.UtilityName === 'Diesel') {
+          dieselTargets.set(`${c.SiteId}|${c.PostingDateMonth}`, c.SiteName);
+        }
+      }
+      for (const [key, siteName] of dieselTargets) {
+        const [siteIdStr, month] = key.split('|');
+        const siteId = Number(siteIdStr);
+        const slots = slotMap(siteId, dieselType.Id, month);
+        const value = Math.round(num(slots['V1']) * 1000) / 1000;
+        const existing = findCalcRow.get(siteId, dieselType.Id, month, 'DIESEL_STD');
+        if (existing) {
+          if (Number(existing.Consumption) !== value) {
+            logChange({
+              tableName: 'UlpureData',
+              recordId: existing.Id,
+              fieldName: 'Consumption',
+              oldValue: existing.Consumption,
+              newValue: value,
+              changedBy: 'System (recalc)',
+            });
+          }
+          updateCalc.run({
+            id: existing.Id,
+            utility: 'Diesel',
+            site: siteName,
+            value,
+            units: meta.units,
+            code: 'DIESEL_STD',
+            indicator: meta.name,
+            indicatorId: meta.id,
+          });
+          keptIds.push(existing.Id);
+        } else {
+          const r = insertCalc.run({
+            month,
+            utilityTypeId: dieselType.Id,
+            siteId,
+            utility: 'Diesel',
+            site: siteName,
+            value,
+            previous: null,
+            units: meta.units,
+            code: 'DIESEL_STD',
+            indicator: meta.name,
+            indicatorId: meta.id,
+          });
+          keptIds.push(r.lastInsertRowid);
+        }
+        results.push({ SiteId: siteId, SiteName: siteName, PostingDateMonth: month, indicator: meta.name, value, units: meta.units });
       }
     }
 

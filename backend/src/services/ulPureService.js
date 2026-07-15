@@ -1,5 +1,6 @@
 const db = require('../config/db');
 const { logFieldChanges } = require('./auditService');
+const { calculateAll } = require('./calculationService');
 
 // Aliased column list: returns UlpureData rows using the legacy UlPureEntries
 // field names so existing controllers / frontend keep working unchanged.
@@ -138,46 +139,72 @@ const insertUlPureEntryFromFormEntry = (formEntry) => {
 
 
 // Generate UL Pure
+const ALLOWED_STATUSES = ['Validated', 'Modified and Validated'];
+
 const moveModifiedValidatedEntriesToUlPure = ({
   site,
-  status,
 }) => {
-  let sql = `
-    SELECT *
-    FROM FormEntries
-    WHERE Status = ?
-  `;
-
-  const params = [
-    status || 'Modified and Validated',
-  ];
-
+  // ── Validation rules: must all pass before any calculation runs ──
+  // Scope to a single site when provided, otherwise validate across all sites.
+  let scopeWhere = '';
+  const scopeParams = [];
   if (site) {
-    sql += ' AND SiteCode = ?';
-    params.push(site);
+    scopeWhere = ' WHERE SiteCode = ?';
+    scopeParams.push(site);
   }
 
-  const entries = db.prepare(sql).all(...params);
+  const allEntries = db
+    .prepare(`SELECT Id, Status, PostingMonth FROM FormEntries${scopeWhere}`)
+    .all(...scopeParams);
 
-  let movedCount = 0;
-
-  for (const entry of entries) {
-    const existing = db
-      .prepare(
-        'SELECT * FROM UlpureData WHERE SourceEntryId = ?'
-      )
-      .get(entry.Id);
-
-    if (!existing) {
-      insertUlPureEntryFromFormEntry(entry);
-      movedCount++;
-    }
+  if (allEntries.length === 0) {
+    const err = new Error(
+      site
+        ? `No form entries found for site "${site}".`
+        : 'No form entries found.'
+    );
+    err.status = 400;
+    throw err;
   }
+
+  // Rule 1: every row must be validated. If any row is Pending (or otherwise
+  // not validated) the whole operation is blocked — no partial calculation.
+  const blocking = allEntries.filter((e) => !ALLOWED_STATUSES.includes(e.Status));
+  if (blocking.length > 0) {
+    const pendingCount = blocking.filter((e) => e.Status === 'Pending').length;
+    const err = new Error(
+      `Cannot generate UL Pure: ${blocking.length} ` +
+        `${blocking.length === 1 ? 'entry is' : 'entries are'} not validated` +
+        `${pendingCount ? ` (${pendingCount} Pending)` : ''}. ` +
+        `All entries must be "Validated" or "Modified and Validated" before generating.`
+    );
+    err.status = 400;
+    throw err;
+  }
+
+  // Rule 2: at least two distinct months of data are required — delta indicators
+  // (Water, District Heating) need a previous-month baseline to calculate.
+  const months = [...new Set(allEntries.map((e) => e.PostingMonth).filter(Boolean))];
+  if (months.length < 2) {
+    const err = new Error(
+      `Cannot generate UL Pure: at least two months of data are required ` +
+        `(found ${months.length}: ${months.join(', ') || 'none'}). ` +
+        `Delta indicators need a previous-month baseline.`
+    );
+    err.status = 400;
+    throw err;
+  }
+
+  // ── Rules passed — run the calculation only ──
+  // This does NOT move/promote form entries into UL Pure. It runs the backend
+  // calc engine, which reads the raw GtoInvoices data and (re)writes only the
+  // Calculated indicator rows.
+  const results = calculateAll();
+  const calculatedCount = results.filter((r) => !r.skipped).length;
 
   return {
-    movedCount,
-    totalFound: entries.length,
-    message: `${movedCount} entries moved to UL Pure`,
+    calculatedCount,
+    message: `${calculatedCount} calculated row${calculatedCount === 1 ? '' : 's'} generated`,
   };
 };
 

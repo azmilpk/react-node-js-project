@@ -28,6 +28,9 @@ function ValidatePage() {
   const [previewFile, setPreviewFile] = useState(null);
   const [previewOpen, setPreviewOpen] = useState(false);
 
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [generating, setGenerating] = useState(false);
+
   const [historyRow, setHistoryRow] = useState(null);
 
   const userRole = getCurrentUserRole();
@@ -243,6 +246,8 @@ function ValidatePage() {
   };
 
   const handleGenerateUlPure = async () => {
+    setConfirmOpen(false);
+    setGenerating(true);
     try {
       const response = await fetch(`${API_BASE_URL}/api/ul-pure-entries/generate`, {
         method: 'POST',
@@ -274,6 +279,8 @@ function ValidatePage() {
     } catch (error) {
       console.error('Generate UL Pure error:', error.message);
       alert(error.message || 'Failed to generate UL Pure data');
+    } finally {
+      setGenerating(false);
     }
   };
 
@@ -509,16 +516,54 @@ function ValidatePage() {
               {!isAuditor && (
                 <button
                   type="button"
-                  onClick={handleGenerateUlPure}
-                  className="h-[40px] px-5 rounded-full bg-black text-white text-[13px] font-semibold hover:bg-neutral-800 transition duration-300 self-start sm:self-auto"
+                  onClick={() => setConfirmOpen(true)}
+                  disabled={generating}
+                  className="h-[40px] px-5 rounded-full bg-black text-white text-[13px] font-semibold hover:bg-neutral-800 transition duration-300 self-start sm:self-auto disabled:opacity-60 disabled:cursor-not-allowed"
                 >
-                  Generate ULpure Data
+                  {generating ? 'Generating…' : 'Generate ULpure Data'}
                 </button>
               )}
             </div>
           </div>
         </section>
       </main>
+
+      {confirmOpen && (
+        <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4">
+          <div className="w-full max-w-md bg-white rounded-[20px] shadow-xl overflow-hidden">
+            <div className="px-6 py-5 border-b border-black/10">
+              <h2 className="text-[18px] font-bold text-black">Generate UL Pure?</h2>
+            </div>
+            <div className="px-6 py-5 text-[14px] text-black/70 leading-relaxed">
+              This will run the UL Pure calculation for
+              <span className="font-semibold text-black">
+                {' '}
+                {selectedSite || 'all sites'}
+              </span>
+              . All entries must be validated and at least two months of data are
+              required. Do you want to continue?
+            </div>
+            <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-black/10">
+              <button
+                type="button"
+                onClick={() => setConfirmOpen(false)}
+                disabled={generating}
+                className="h-[40px] px-5 rounded-full border border-black/20 text-black text-[13px] font-semibold hover:bg-black/5 transition duration-300 disabled:opacity-60"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleGenerateUlPure}
+                disabled={generating}
+                className="h-[40px] px-5 rounded-full bg-black text-white text-[13px] font-semibold hover:bg-neutral-800 transition duration-300 disabled:opacity-60 disabled:cursor-not-allowed"
+              >
+                {generating ? 'Generating…' : 'Yes, Generate'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {previewOpen && previewFile && (
         <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4">
