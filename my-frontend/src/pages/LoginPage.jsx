@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import TopNavbar from '../components/topnavbar/TopNavbar';
-import volvoLogo from '../assets/images/VolvoLogo.png';
+import loginBg from '../assets/images/login1.jpg';
+import showIcon from '../assets/images/show.svg';
 import { API_BASE_URL } from '../config/api';
 
 function LoginPage() {
@@ -13,6 +14,7 @@ function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   const handleLogin = async () => {
     try {
@@ -69,22 +71,38 @@ function LoginPage() {
   };
 
   return (
-    <div className="w-full h-screen overflow-hidden flex flex-col bg-neutral-200">
+    <div
+      className="w-full h-screen overflow-hidden flex flex-col"
+      style={{
+        backgroundImage: `url(${loginBg})`,
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        backgroundRepeat: 'no-repeat',
+      }}
+    >
       <TopNavbar />
 
       <main className="flex-1 min-h-0 flex items-center justify-center px-4 py-6">
-        <div className="w-full max-w-sm bg-white rounded-2xl shadow-lg px-5 py-6 sm:px-6 sm:py-7 text-center">
-          <h1 className="text-emerald-700 font-bold leading-tight text-2xl sm:text-[28px] mb-2">
+        <div className="w-full max-w-sm rounded-2xl px-5 py-6 sm:px-6 sm:py-7 text-center"
+          style={{
+            background: 'rgba(255, 255, 255, 0.15)',
+            backdropFilter: 'blur(18px)',
+            WebkitBackdropFilter: 'blur(18px)',
+            border: '1px solid rgba(255, 255, 255, 0.3)',
+            boxShadow: '0 8px 32px rgba(0, 0, 0, 0.35)',
+          }}
+        >
+          <h1 className="text-white font-bold leading-tight text-2xl sm:text-[28px] mb-2" style={{textShadow:'0 1px 4px rgba(0,0,0,0.4)'}}>
             Login
           </h1>
 
-          <p className="text-gray-800 text-sm sm:text-[15px] font-medium mb-5">
+          <p className="text-white/90 text-sm sm:text-[15px] font-medium mb-5">
             {selectedRole ? `${selectedRole} Login` : 'Please Login'}
           </p>
 
           <div className="space-y-3 text-left">
             <div>
-              <label className="block text-[13px] font-semibold text-black mb-2">
+              <label className="block text-[13px] font-semibold text-white mb-2">
                 Email
               </label>
               <input
@@ -92,21 +110,34 @@ function LoginPage() {
                 placeholder="Enter email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full h-10 border border-gray-300 px-4 rounded-lg outline-none text-[14px]"
+                className="w-full h-10 px-4 rounded-lg outline-none text-[14px] text-white placeholder-white/60"
+                style={{ background: 'rgba(255,255,255,0.15)', border: '1px solid rgba(255,255,255,0.35)' }}
               />
             </div>
 
             <div>
-              <label className="block text-[13px] font-semibold text-black mb-2">
+              <label className="block text-[13px] font-semibold text-white mb-2">
                 Password
               </label>
-              <input
-                type="password"
-                placeholder="Enter password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full h-10 border border-gray-300 px-4 rounded-lg outline-none text-[14px]"
-              />
+              <div className="relative">
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  placeholder="Enter password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="w-full h-10 px-4 pr-10 rounded-lg outline-none text-[14px] text-white placeholder-white/60"
+                  style={{ background: 'rgba(255,255,255,0.15)', border: '1px solid rgba(255,255,255,0.35)' }}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((v) => !v)}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 opacity-70 hover:opacity-100 transition-opacity"
+                  tabIndex={-1}
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                >
+                  <img src={showIcon} alt="Show password" className="w-4 h-4" style={{ opacity: 0.4 }} />
+                </button>
+              </div>
             </div>
           </div>
 
@@ -130,11 +161,9 @@ function LoginPage() {
           </div>
 
           <div className="mt-6 flex justify-center">
-            <img
-              src={volvoLogo}
-              alt="Volvo logo"
-              className="w-20 sm:w-24 h-auto object-contain"
-            />
+            
+              
+            
           </div>
         </div>
       </main>

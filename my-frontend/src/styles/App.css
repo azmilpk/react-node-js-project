@@ -13,6 +13,17 @@ body,
   box-sizing: border-box;
 }
 
+input::-ms-reveal,
+input::-ms-clear {
+  display: none;
+}
+
+input[type='password']::-webkit-credentials-auto-fill-button,
+input[type='password']::-webkit-textfield-decoration-container {
+  display: none !important;
+  visibility: hidden;
+}
+
 body {
   overflow: hidden;
 }

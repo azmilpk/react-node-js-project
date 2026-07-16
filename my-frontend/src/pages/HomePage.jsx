@@ -1,6 +1,6 @@
 import { useNavigate } from 'react-router-dom';
 import TopNavbar from '../components/topnavbar/TopNavbar';
-import homeImage from '../assets/images/HomeBack2.png';
+import homeImage from '../assets/images/Homepage.jpg';
 import volvoLogo from '../assets/images/VolvoLogo.png';
 
 function HomePage() {
