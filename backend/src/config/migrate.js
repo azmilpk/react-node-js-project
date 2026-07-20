@@ -1,28 +1,10 @@
 const db = require('./db');
 
-db.exec(`
-  CREATE TABLE IF NOT EXISTS FormEntries (
-    Id INTEGER PRIMARY KEY AUTOINCREMENT,
-    EntryNumber TEXT NOT NULL,
-    FacilityCode TEXT,
-    SiteCode TEXT NOT NULL,
-    UtilityCode TEXT NOT NULL,
-    UtilityName TEXT,
-    PostingMonth TEXT NOT NULL,
-    AccountMeterNo TEXT,
-    Units TEXT,
-    Consumption REAL,
-    Status TEXT NOT NULL DEFAULT 'Pending',
-    CreatedBy TEXT,
-    CreatedAt TEXT NOT NULL DEFAULT (datetime('now')),
-    FileName TEXT,
-    FileUrl TEXT,
-    PdfUrl TEXT,
-    Comment TEXT,
-    FormValuesJson TEXT,
-    EntryName TEXT
-  );
-`);
+// NOTE: The legacy `FormEntries` table is RETIRED. Both bot and manual entries
+// now land directly in the single `GtoInvoices` table (see the manual-entry
+// columns added further below). The old table is dropped here so it can never
+// be written to again; this is a no-op once it's gone.
+db.exec('DROP TABLE IF EXISTS FormEntries;');
 
 db.exec(`
   CREATE TABLE IF NOT EXISTS AuditLog (
@@ -50,12 +32,20 @@ const ensureColumn = (tableName, columnName, definition) => {
   }
 };
 
-ensureColumn('FormEntries', 'FacilityCode', 'TEXT');
-ensureColumn('FormEntries', 'UtilityName', 'TEXT');
-ensureColumn('FormEntries', 'Comment', 'TEXT');
-ensureColumn('FormEntries', 'FormValuesJson', 'TEXT');
-ensureColumn('FormEntries', 'EntryName', 'TEXT');
-ensureColumn('FormEntries', 'ModifiedAt', 'TEXT');
+// Physically remove a column left over from a retired design. Idempotent:
+// once the column is gone, subsequent runs are a no-op.
+const dropColumn = (tableName, columnName) => {
+  try {
+    db.exec(`ALTER TABLE ${tableName} DROP COLUMN ${columnName};`);
+    console.log(`${columnName} column dropped from ${tableName}`);
+  } catch (error) {
+    if (error.message.includes('no such column')) {
+      // Already removed (or never existed) — nothing to do.
+    } else {
+      throw error;
+    }
+  }
+};
 
 /* ------------------------------------------------------------------ *
  * Improved schema (Path B): normalized lookups + typed raw/clean data
@@ -91,7 +81,6 @@ db.exec(`
     ConstantValue REAL,
     InvoiceDate TEXT,
     PostingDateMonth TEXT,
-    Hitl TEXT,
     BotStatus TEXT,
     DataSource TEXT,
     UtilityTypeId INTEGER REFERENCES UtilityTypes(Id),
@@ -153,6 +142,12 @@ const seedUtility = db.prepare(
   'Energy Consumption',
   'Renewable Electricity',
   'Produced Units',
+  // US site utilities (RT100, MEC, Macungie, LVLC)
+  'Forklift Propane',
+  'Kitchen Propane',
+  'HVO Diesel Transport',
+  'HVO 100 Process',
+  'Water withdrawal - City water',
 ].forEach((name) => seedUtility.run(name));
 
 const seedSite = db.prepare('INSERT OR IGNORE INTO Sites (SiteName) VALUES (?)');
@@ -166,6 +161,7 @@ const setRegonId = db.prepare(
   "UPDATE Sites SET RegonId = ? WHERE SiteName = ? AND (RegonId IS NULL OR RegonId = '')"
 );
 setRegonId.run('64854062', 'Köping');
+setRegonId.run('64854091', 'NRV');
 
 /* ------------------------------------------------------------------ *
  * Make UlpureData able to fully stand in for UlPureEntries:
@@ -173,6 +169,42 @@ setRegonId.run('64854062', 'Köping');
  * ------------------------------------------------------------------ */
 // Link GtoInvoices rows back to the form entry that produced them (manual flow)
 ensureColumn('GtoInvoices', 'SourceEntryId', 'INTEGER');
+
+/* ------------------------------------------------------------------ *
+ * Consolidated entry model: FormEntries is retired, so GtoInvoices is now
+ * the SINGLE landing table for BOTH bot-imported and manually-entered data.
+ * These columns carry the manual-entry / Validate-page workflow fields.
+ * Site, facility and utility are NOT duplicated here: they come from the
+ * existing SiteId (-> Sites.SiteName), Facility and UtilityTypeId columns.
+ * ------------------------------------------------------------------ */
+// Validate workflow status: entries are created 'Validated' directly.
+ensureColumn('GtoInvoices', 'Status', "TEXT DEFAULT 'Validated'");
+// Who created a manual entry (bot rows leave this NULL)
+ensureColumn('GtoInvoices', 'CreatedBy', 'TEXT');
+// Last-modified audit stamps (who + when), mirroring UlpureData
+ensureColumn('GtoInvoices', 'ModifiedBy', 'TEXT');
+ensureColumn('GtoInvoices', 'ModifiedAt', 'TEXT');
+
+// Retired columns from earlier designs: site/facility/utility are derived from
+// SiteId, Facility and UtilityTypeId; meter uses AccountNumber; the file URL
+// uses PdfFile. Hitl is retired (calc engine no longer filters on it).
+// Drop the leftover physical columns so the table stays clean.
+[
+  'EntryNumber',
+  'EntryName',
+  'SiteCode',
+  'FacilityCode',
+  'UtilityCode',
+  'FileUrl',
+  'UtilityName',
+  'AccountMeterNo',
+  'FileName',
+  'FormValuesJson',
+  'Hitl',
+].forEach((col) => dropColumn('GtoInvoices', col));
+
+// Ensure every existing row is Validated (no Pending step anymore).
+db.exec("UPDATE GtoInvoices SET Status = 'Validated' WHERE Status IS NULL OR Status = 'Pending'");
 // File
 ensureColumn('UlpureData', 'FileName', 'TEXT');
 ensureColumn('UlpureData', 'FileUrl', 'TEXT');

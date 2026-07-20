@@ -71,6 +71,52 @@ const TEMPLATE_UTILITY = {
   'Produced Units': 'Produced Units',
 };
 
+// ─── PER-SITE (US) IMPORT MAPPING ────────────────────────────────────────────
+// US sites (RT100, MEC, Macungie, LVLC) identify a utility by its account number
+// (occasionally a template type / facility) rather than the Köping-style Excel
+// `Templatetype`. Every US utility is pass-through into ValueSlot V1; the real
+// per-site math + indicators live in calculationService.SITE_FORMULAS, resolved
+// by `${site}|${utility}` — so FormulaCode here is just a marker.
+//
+// NOTE: only the account identifiers given in the site spec are mapped below.
+// Add the remaining account numbers as the full US account lists arrive; any
+// unmapped account is reported at the end of the run.
+const US_SITES = new Set(['RT100', 'MEC', 'Macungie', 'LVLC']);
+const SITE_ACCOUNT_UTILITY = {
+  RT100: {
+    '26660': 'Propane',
+    '10972': 'Water',
+    '07917-75025': 'Electricity',
+  },
+  MEC: {
+    '13003': 'Diesel',
+    '411007249872': 'Natural Gas',
+    '54260-10009': 'Electricity',
+    '49149-78004': 'Electricity',
+    '51200': 'Water',
+    '51201': 'Water',
+    'Kitchen Propane': 'Kitchen Propane',
+    'Forklift Propane': 'Forklift Propane',
+  },
+  Macungie: {
+    '26660': 'Propane',
+    diesel_hvo_transport: 'HVO Diesel Transport',
+    diesel_hvo_process: 'HVO 100 Process',
+    // TODO: Natural Gas, Electricity, Gasoline, Water, Produced Units accounts
+  },
+  LVLC: {
+    '28580': 'Propane',
+    '39521-50018': 'Electricity',
+    // TODO: Natural Gas, Water accounts
+  },
+};
+
+// Fallback: match a US utility by Templatetype text when no account is mapped.
+const US_TEMPLATE_UTILITY = {
+  'diesel internal transport': 'HVO Diesel Transport',
+  'hvo 100 process': 'HVO 100 Process',
+};
+
 // ─────────────────────────────────────────────────────────────────────────────
 
 const filePath = process.argv[2];
@@ -111,13 +157,13 @@ const insert = db.prepare(`
   INSERT INTO GtoInvoices (
     AccountNumber, ValueSlot, Consumption, PreviousConsumption,
     FreshWaterStaticValue, EvaporationFactorValue, ConstantValue,
-    InvoiceDate, PostingDateMonth, Hitl, BotStatus, DataSource,
+    InvoiceDate, PostingDateMonth, BotStatus, DataSource,
     UtilityTypeId, SiteId, TemplateType, Facility, Units, FormulaCode,
     PdfFile, InvoiceNo, ValidateUser, Approver, Comments, ValidatorLoginTime
   ) VALUES (
     @accountNumber, @valueSlot, @consumption, @previousConsumption,
     @freshWater, @evaporation, @constantValue,
-    @invoiceDate, @postingDateMonth, @hitl, @botStatus, @dataSource,
+    @invoiceDate, @postingDateMonth, @botStatus, @dataSource,
     @utilityTypeId, @siteId, @templateType, @facility, @units, @formulaCode,
     @pdfFile, @invoiceNo, @validateUser, @approver, @comments, @validatorLoginTime
   )
@@ -128,8 +174,35 @@ const unmappedAccounts = new Set();
 const mapRow = (r) => {
   const templateType = r.Templatetype || '';
   const account = r.Accountnumber || '';
-  const valueSlot = ACCOUNT_VALUE_SLOT[account] || null;
-  if (!valueSlot && account) unmappedAccounts.add(`[${templateType}] ${account}`);
+  const site = r.site || '';
+
+  // US sites resolve the utility from the account number (or a template-type
+  // fallback) and are always pass-through into V1. Köping keeps the classic
+  // Templatetype + account->slot mapping.
+  let utilityName = TEMPLATE_UTILITY[templateType] || null;
+  let valueSlot = ACCOUNT_VALUE_SLOT[account] || null;
+  let formulaCode = TEMPLATE_FORMULA[templateType] || null;
+
+  if (US_SITES.has(site)) {
+    const mapped =
+      SITE_ACCOUNT_UTILITY[site]?.[account] ||
+      US_TEMPLATE_UTILITY[String(templateType).toLowerCase()] ||
+      null;
+    if (mapped) {
+      utilityName = mapped;
+      // Store each meter under its own slot (its account number) so a utility
+      // with several meters in a month keeps every reading; the calc engine
+      // sums all slots for US pass-through formulas.
+      valueSlot = account || 'V1';
+      formulaCode = 'SITE_FORMULA'; // engine resolves math by `${site}|${utility}`
+    } else if (account) {
+      unmappedAccounts.add(`[${site}] ${account}`);
+    }
+  } else if (site === 'Köping' && !valueSlot && account) {
+    // Only Köping uses account->slot mapping; other sites (e.g. NRV) keep their
+    // raw TemplateType and are aggregated by the calc engine, so don't warn.
+    unmappedAccounts.add(`[${templateType}] ${account}`);
+  }
 
   return {
     accountNumber: account || null,
@@ -141,15 +214,14 @@ const mapRow = (r) => {
     constantValue: toNum(r.ConstantValue),
     invoiceDate: toISODate(r.Invoicedate),
     postingDateMonth: r.Postingdatemonth || null,
-    hitl: r.Hitl || null,
     botStatus: r.Botstatus || null,
     dataSource: r.Datasource || null,
-    utilityTypeId: utilityIdByName.get(TEMPLATE_UTILITY[templateType]) || null,
-    siteId: siteIdByName.get(r.site || '') || null,
+    utilityTypeId: utilityIdByName.get(utilityName) || null,
+    siteId: siteIdByName.get(site) || null,
     templateType: templateType || null,
     facility: r.facility || null,
     units: r.units || null,
-    formulaCode: TEMPLATE_FORMULA[templateType] || null,
+    formulaCode,
     pdfFile: r.PdfFile || null,
     invoiceNo: r.InvoiceNo || null,
     validateUser: r.Validateuser || null,
@@ -159,11 +231,14 @@ const mapRow = (r) => {
   };
 };
 
-const kopingId = siteIdByName.get('Köping');
-
 const run = db.transaction(() => {
-  if (kopingId) db.prepare('DELETE FROM GtoInvoices WHERE SiteId = ?').run(kopingId);
-  for (const r of rows) insert.run(mapRow(r));
+  const mapped = rows.map(mapRow);
+  // Idempotent per site: clear only the sites present in this file, then insert.
+  const siteIds = new Set();
+  for (const m of mapped) if (m.siteId) siteIds.add(m.siteId);
+  const del = db.prepare('DELETE FROM GtoInvoices WHERE SiteId = ?');
+  for (const id of siteIds) del.run(id);
+  for (const m of mapped) insert.run(m);
 });
 
 run();

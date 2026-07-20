@@ -146,22 +146,28 @@ const moveModifiedValidatedEntriesToUlPure = ({
 }) => {
   // ── Validation rules: must all pass before any calculation runs ──
   // Scope to a single site when provided, otherwise validate across all sites.
+  // Entries now live in the single GtoInvoices table (bot + manual), scoped by
+  // the site FK so bot rows (which carry SiteId, not SiteCode) are included.
   let scopeWhere = '';
   const scopeParams = [];
   if (site) {
-    scopeWhere = ' WHERE SiteCode = ?';
+    scopeWhere = ' WHERE SiteId = (SELECT Id FROM Sites WHERE SiteName = ?)';
     scopeParams.push(site);
   }
 
   const allEntries = db
-    .prepare(`SELECT Id, Status, PostingMonth FROM FormEntries${scopeWhere}`)
+    .prepare(
+      `SELECT Id, COALESCE(Status, 'Pending') AS Status,
+              PostingDateMonth AS PostingMonth
+         FROM GtoInvoices${scopeWhere}`
+    )
     .all(...scopeParams);
 
   if (allEntries.length === 0) {
     const err = new Error(
       site
-        ? `No form entries found for site "${site}".`
-        : 'No form entries found.'
+        ? `No entries found for site "${site}".`
+        : 'No entries found.'
     );
     err.status = 400;
     throw err;
@@ -182,24 +188,27 @@ const moveModifiedValidatedEntriesToUlPure = ({
     throw err;
   }
 
-  // Rule 2: at least two distinct months of data are required — delta indicators
-  // (Water, District Heating) need a previous-month baseline to calculate.
-  const months = [...new Set(allEntries.map((e) => e.PostingMonth).filter(Boolean))];
-  if (months.length < 2) {
-    const err = new Error(
-      `Cannot generate UL Pure: at least two months of data are required ` +
-        `(found ${months.length}: ${months.join(', ') || 'none'}). ` +
-        `Delta indicators need a previous-month baseline.`
-    );
-    err.status = 400;
-    throw err;
+  // Rule 2: Köping's delta indicators (Water, District Heating) need a
+  // previous-month baseline, so it requires at least two distinct months. Other
+  // sites are pass-through / aggregation and calculate fine from a single month.
+  if (!site || site === 'Köping') {
+    const months = [...new Set(allEntries.map((e) => e.PostingMonth).filter(Boolean))];
+    if (months.length < 2) {
+      const err = new Error(
+        `Cannot generate UL Pure: at least two months of data are required ` +
+          `(found ${months.length}: ${months.join(', ') || 'none'}). ` +
+          `Delta indicators need a previous-month baseline.`
+      );
+      err.status = 400;
+      throw err;
+    }
   }
 
   // ── Rules passed — run the calculation only ──
   // This does NOT move/promote form entries into UL Pure. It runs the backend
   // calc engine, which reads the raw GtoInvoices data and (re)writes only the
-  // Calculated indicator rows.
-  const results = calculateAll();
+  // Calculated indicator rows — scoped to the selected site when provided.
+  const results = calculateAll({ site });
   const calculatedCount = results.filter((r) => !r.skipped).length;
 
   return {

@@ -1,5 +1,9 @@
 require('dotenv').config();
-require('./config/migrate');
+// Only create/seed tables against the local SQLite dev database.
+// When pointed at an external DB (DB_CLIENT=mssql), never run schema migrations or seeds.
+if ((process.env.DB_CLIENT || 'sqlite').toLowerCase() !== 'mssql') {
+  require('./config/migrate');
+}
 
 const express = require('express');
 const cors = require('cors');

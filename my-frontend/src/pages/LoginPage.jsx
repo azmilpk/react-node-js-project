@@ -74,7 +74,7 @@ function LoginPage() {
     <div
       className="w-full h-screen overflow-hidden flex flex-col"
       style={{
-        backgroundImage: `url(${loginBg})`,
+        backgroundImage: `linear-gradient(rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 0.5)), url(${loginBg})`,
         backgroundSize: 'cover',
         backgroundPosition: 'center',
         backgroundRepeat: 'no-repeat',
@@ -154,7 +154,7 @@ function LoginPage() {
             <button
               type="button"
               onClick={() => navigate('/')}
-              className="w-full h-10 rounded-full border border-black text-black text-sm font-semibold hover:bg-black hover:text-white transition-all duration-300"
+              className="w-full h-10 rounded-full border border-black text-white text-sm font-semibold hover:bg-black hover:text-white transition-all duration-300"
             >
               Back
             </button>

@@ -24,6 +24,12 @@ function slotMap(siteId, utilityTypeId, month) {
 }
 
 // One function per utility. cur = this month's slots, prev = last month's slots.
+//
+// Per-site configuration (Option A): formulas are resolved by `${SiteName}|${UtilityName}`
+// first, falling back to the plain `${UtilityName}` default below. The generic
+// entries here are the defaults used by Köping and any site without an override.
+// To give a site different math, add an entry to SITE_FORMULAS (see below) — the
+// engine loop never changes.
 const FORMULAS = {
   Electricity({ cur }) {
     const v = (k) => num(cur[k]);
@@ -101,9 +107,28 @@ const FORMULAS = {
   },
 };
 
-// Utilities whose value is a month-over-month meter delta and therefore
-// need a previous month as a baseline to be meaningful.
-const DELTA_UTILITIES = new Set(['District Heating', 'Water']);
+// The helpers below build the per-utility formula functions used by SITE_CONFIG
+// (the registry lower down). Each returns a formula of the same shape as a
+// FORMULAS entry — ({ cur, prev }) => output(s) — and a site-specific formula
+// takes precedence over a DIRECT form row so its multiplier / mirrored discharge
+// / correct indicator always applies. A US utility can have several meters in a
+// month (e.g. two water or electricity meters), each stored as its own slot, so
+// the helpers sum every slot; Water always emits a mirrored "Water discharge".
+const sumSlots = (cur) => Object.values(cur).reduce((total, v) => total + num(v), 0);
+const passThrough = (units, code) => ({ cur }) => ({ value: sumSlots(cur), units, code });
+const scaled = (factor, units, code) => ({ cur }) => ({ value: sumSlots(cur) * factor, units, code });
+const waterWithDischarge = (useCode) => ({ cur }) => {
+  const v = sumSlots(cur);
+  return [
+    { value: v, units: 'US gallon', code: useCode },
+    { indicator: 'Water discharge', utility: 'Water discharge', value: v, units: 'US gallon', code: 'WATER_DISCH_GAL' },
+  ];
+};
+
+// US natural gas is metered in CCF (hundred cubic feet). 1 CCF ≈ 1.037 therms
+// and 1 therm = 0.0293071070172 MWh, so CCF -> MWh combines both factors.
+const NAT_GAS_CCF_TO_MWH = 1.037 * 0.0293071070172;
+const KITCHEN_PROPANE_TO_LB = 4.24;
 
 // Official ESG indicator metadata, keyed by the formula code each output uses.
 // This drives the Indicator Name / Indicator Id / Units shown in UL Pure so the
@@ -120,6 +145,156 @@ const INDICATOR_META = {
   LPG_STD:      { id: '65141617', name: 'LPG_Indicator', units: 'MWh' },
   PRODUCED_STD: { id: '65245956', name: 'Gearbox', units: 'Number' },
   DIESEL_STD:   { id: '65143046', name: 'Diesel Volvo STD - Internal Transports in Energy', units: 'MWh' },
+
+  // ── US sites (RT100, MEC, Macungie, LVLC) — see SITE_FORMULAS above ──
+  ELEC_PASS:          { id: '64885465', name: 'Purchased electricity - Process', units: 'kWh' },
+  NATGAS_PASS:        { id: '91310049', name: 'Natural Gas - Heating / Cooling in Energy', units: 'MWh' },
+  WATER_USE_GAL:      { id: '64886067', name: 'City water, Water use in process excluded cooling', units: 'US gallon' },
+  WATER_DOM_GAL:      { id: '71136904', name: 'City water, Domestic water use', units: 'US gallon' },
+  WATER_DISCH_GAL:    { id: '80077162', name: 'Water sent to a municipal, or similar, water treatment facility', units: 'US gallon' },
+  PROPANE_HC_VOL_GAL: { id: '65141529', name: 'LPG, Propane/gasol - Heating / Cooling in Volume', units: 'US gallon' },
+  PROPANE_IT_VOL_GAL: { id: '65141565', name: 'LPG, Propane/gasol - Internal Transports in Volume', units: 'US gallon' },
+  FORKLIFT_PROPANE:   { id: '65141564', name: 'LPG, Propane/gasol - Internal Transports in Mass', units: 'lb' },
+  KITCHEN_PROPANE:    { id: '65141527', name: 'LPG, Propane/gasol - Heating / Cooling in Mass', units: 'lb' },
+  GASOLINE_IT:        { id: '65208548', name: 'Petrol - Internal Transports in Volume', units: 'US gallon' },
+  DIESEL_PROC_GAL:    { id: '65143062', name: 'Diesel Volvo STD - Process in Volume', units: 'US gallon' },
+  DIESEL_PROC_L:      { id: '65143062', name: 'Diesel Volvo STD - Process in Volume', units: 'litre' },
+  HVO_TRANSPORT:      { id: '65143047', name: 'Diesel Volvo STD - Internal Transports in Volume', units: 'US gallon' },
+  PRODUCED_TRUCKS:    { id: '65245952', name: 'Trucks CBU', units: 'Number' },
+};
+
+// ── NRV (New River Valley, VA) ───────────────────────────────────────────────
+// NRV generates a fixed set of report lines per month. Unlike the slot-based
+// sites, most lines are a SUM of GtoInvoices rows matched by TemplateType (and
+// sometimes an AccountNumber pattern), filtered to site NRV, the month, and
+// Hitl not 'pending'. A few lines are fixed constants. Faithful port of the
+// NRV MERGE SQL; handled by a dedicated pass in calculateAll (not SITE_FORMULAS).
+const NRV_REGON_ID = '64854091';
+
+// Each summed line: SUM(Consumption) over rows matching `where`; `round` decimals
+// (null = no rounding). id/name/units drive the stored indicator metadata.
+const NRV_SUM_UTILITIES = [
+  { utility: 'Electricity', code: 'NRV_ELEC', round: 3, id: '64885465', name: 'Purchased electricity - Process', units: 'kWh',
+    where: "(LOWER(TRIM(TemplateType)) = 'electricity' OR (LOWER(TRIM(TemplateType)) LIKE '%renewable electrici%' AND LOWER(TRIM(AccountNumber)) NOT LIKE '%solar pv array%'))" },
+  { utility: 'RenewableElectricity', code: 'NRV_RENEW_ELEC', round: 3, id: '65418678', name: 'Renewable electricity produced and used on site - Process', units: 'kWh',
+    where: "LOWER(TRIM(TemplateType)) LIKE '%renewable electrici%' AND LOWER(TRIM(AccountNumber)) LIKE '%solar pv array%'" },
+  { utility: 'Naturalgas', code: 'NRV_NATGAS', round: 2, id: '65142759', name: 'Natural Gas - Process in Energy', units: 'MMBTU (US)',
+    where: "LOWER(TRIM(TemplateType)) = 'naturalgas'" },
+  { utility: 'Diesel', code: 'NRV_DIESEL', round: null, id: '68459062', name: 'Diesel, ULSD, USA - Internal Transports in Volume', units: 'US gallon',
+    where: "LOWER(TRIM(TemplateType)) = 'diesel' AND LOWER(TRIM(AccountNumber)) LIKE '%diesel ignition%'" },
+  { utility: 'DieselProductTest', code: 'NRV_DIESEL_PT', round: null, id: '68459053', name: 'Diesel, ULSD, USA - Product Testing in Volume', units: 'litre',
+    where: "LOWER(TRIM(TemplateType)) = 'diesel' AND LOWER(TRIM(AccountNumber)) LIKE '%disel powerbi%'" },
+  { utility: 'Petrol', code: 'NRV_PETROL', round: null, id: '65208548', name: 'Petrol - Internal Transports in Volume', units: 'US gallon',
+    where: "LOWER(TRIM(TemplateType)) = 'petrol'" },
+  { utility: 'Propane', code: 'NRV_PROPANE', round: null, id: '65141619', name: 'LPG, Propane/gasol - Process in Volume', units: 'US gallon',
+    where: "LOWER(TRIM(TemplateType)) IN ('propane','arc3')" },
+  { utility: 'Producedunits', code: 'NRV_PRODUCED', round: null, id: '65245952', name: 'Trucks CBU', units: 'Number',
+    where: "LOWER(TRIM(TemplateType)) = 'produced units'" },
+  { utility: 'Water', code: 'NRV_WATER', round: null, id: '64886067', name: 'City water, Water use in process excluded cooling', units: 'US gallon',
+    where: "LOWER(TRIM(TemplateType)) = 'water'" },
+  { utility: 'WT_Treated', code: 'NRV_WT_TREATED', round: null, id: '81642927', name: 'Total amount of water treated', units: 'US gallon',
+    where: "LOWER(TRIM(TemplateType)) = 'wt_treated'" },
+  { utility: 'WT_RUO', code: 'NRV_WT_RUO', round: null, id: '80231623', name: 'Total volume of water recycled and reused by the organization', units: 'US gallon',
+    where: "LOWER(TRIM(TemplateType)) = 'wt_ruo'" },
+  { utility: 'WT_TreatedFacility', code: 'NRV_WT_TREATEDFAC', round: null, id: '80077162', name: 'Water sent to a municipal, or similar, water treatment facility', units: 'US gallon',
+    where: "LOWER(TRIM(TemplateType)) = 'wt_treatedfacility'" },
+  { utility: 'WT_WS', code: 'NRV_WT_WS', round: null, id: '92084826', name: 'Water stored', units: 'US gallon',
+    where: "LOWER(TRIM(TemplateType)) = 'wt_ws'" },
+];
+
+// Fixed constant lines (no source rows).
+const NRV_CONSTANTS = [
+  { utility: 'WT_WTP', code: 'NRV_WT_WTP', value: 'Yes', id: '81642984', name: 'Do you have an on-site water treatment plant?', units: 'Yes/No' },
+  { utility: 'RenewableCoverage', code: 'NRV_RENEW_COV', value: 100, id: '95864481', name: 'GTP form entry: Renewable coverage (%)', units: '%' },
+  { utility: 'DieselRenewable', code: 'NRV_DIESEL_RENEW', value: 0, id: '68459080', name: 'Diesel, ULSD, USA - Renewable (%)', units: '%' },
+  { utility: 'DieselSulphur', code: 'NRV_DIESEL_SULPHUR', value: 0, id: '88341649', name: 'Diesel, ULSD, USA - Sulphur content - site level (ppm)', units: 'ppm.' },
+];
+
+// ── Per-site configuration registry ─────────────────────────────────────────
+// The single source of truth for how each site calculates. To add a new site,
+// add one entry here — the engine below reads everything from this map and never
+// needs to change. (You also seed the Sites/UtilityTypes rows in migrate.js and
+// the raw account→utility mapping in importGtoInvoices.js.) Fields:
+//   mode           'slot'      -> per-utility meter formulas (Köping + US sites)
+//                  'aggregate' -> SUM GtoInvoices rows by TemplateType (NRV)
+//   rounding       decimals to round each value to (null = keep the raw value)
+//   formulas       { UtilityName: ({cur,prev}) => output(s) } site overrides;
+//                  any utility not listed falls back to the generic FORMULAS
+//   deltaUtilities utilities needing a previous-month baseline (skipped if none)
+//   guaranteedRows always emit one row per active month from a single slot
+//                  (value or 0) — for utilities with no meter formula
+//   sumUtilities / constants   aggregate-mode inputs (see NRV_* above)
+//   regonId        reporting id (seeded in migrate.js; kept here for reference)
+const SITE_CONFIG = {
+  Köping: {
+    mode: 'slot',
+    rounding: 3,
+    regonId: '64854062',
+    // Köping uses the generic FORMULAS (Electricity, District Heating, Water,
+    // LPG, Produced Units); Diesel is a guaranteed row (no meter formula).
+    formulas: {},
+    deltaUtilities: ['District Heating', 'Water'],
+    guaranteedRows: [
+      { utility: 'Diesel', code: 'DIESEL_STD', slot: 'V1', round: 3 },
+    ],
+  },
+
+  RT100: {
+    mode: 'slot',
+    rounding: null,
+    formulas: {
+      Propane: passThrough('US gallon', 'PROPANE_HC_VOL_GAL'),
+      Electricity: passThrough('kWh', 'ELEC_PASS'),
+      Water: waterWithDischarge('WATER_DOM_GAL'),
+    },
+  },
+
+  MEC: {
+    mode: 'slot',
+    rounding: null,
+    formulas: {
+      Diesel: passThrough('US gallon', 'DIESEL_PROC_GAL'),
+      'Forklift Propane': passThrough('lb', 'FORKLIFT_PROPANE'),
+      'Kitchen Propane': scaled(KITCHEN_PROPANE_TO_LB, 'lb', 'KITCHEN_PROPANE'),
+      'Natural Gas': scaled(NAT_GAS_CCF_TO_MWH, 'MWh', 'NATGAS_PASS'),
+      Electricity: passThrough('kWh', 'ELEC_PASS'),
+      Water: waterWithDischarge('WATER_USE_GAL'),
+    },
+  },
+
+  Macungie: {
+    mode: 'slot',
+    rounding: null,
+    formulas: {
+      Propane: passThrough('US gallon', 'PROPANE_IT_VOL_GAL'),
+      'Natural Gas': scaled(NAT_GAS_CCF_TO_MWH, 'MWh', 'NATGAS_PASS'),
+      Electricity: passThrough('kWh', 'ELEC_PASS'),
+      Gasoline: passThrough('US gallon', 'GASOLINE_IT'),
+      'HVO Diesel Transport': passThrough('US gallon', 'HVO_TRANSPORT'),
+      'HVO 100 Process': passThrough('litre', 'DIESEL_PROC_L'),
+      Water: waterWithDischarge('WATER_USE_GAL'),
+      'Produced Units': passThrough('Number', 'PRODUCED_TRUCKS'),
+    },
+  },
+
+  LVLC: {
+    mode: 'slot',
+    rounding: null,
+    formulas: {
+      Propane: passThrough('US gallon', 'PROPANE_HC_VOL_GAL'),
+      'Natural Gas': scaled(NAT_GAS_CCF_TO_MWH, 'MWh', 'NATGAS_PASS'),
+      Electricity: passThrough('kWh', 'ELEC_PASS'),
+      Water: waterWithDischarge('WATER_USE_GAL'),
+    },
+  },
+
+  NRV: {
+    mode: 'aggregate',
+    rounding: null,
+    regonId: NRV_REGON_ID,
+    sumUtilities: NRV_SUM_UTILITIES,
+    constants: NRV_CONSTANTS,
+  },
 };
 
 // Manual form entries land as DIRECT rows: a single, already-final value that
@@ -137,7 +312,16 @@ const manualExistsStmt = db.prepare(`
   WHERE SourceEntryId = ? AND DataSource = 'Manual' LIMIT 1
 `);
 
-function calculateAll() {
+function calculateAll({ site } = {}) {
+  // When a site is given, resolve its id and scope everything (combos, the
+  // special passes, and the prune) to that site so other sites' Calculated
+  // rows are never recomputed or deleted. No site = process every site.
+  const siteRow = site
+    ? db.prepare('SELECT Id FROM Sites WHERE SiteName = ?').get(site)
+    : null;
+  const siteId = siteRow ? siteRow.Id : null;
+  if (site && !siteId) return []; // unknown site -> nothing to do
+
   const combos = db.prepare(`
     SELECT DISTINCT g.SiteId, g.UtilityTypeId, g.PostingDateMonth,
            s.SiteName, u.UtilityName
@@ -145,8 +329,9 @@ function calculateAll() {
     JOIN Sites s ON s.Id = g.SiteId
     JOIN UtilityTypes u ON u.Id = g.UtilityTypeId
     WHERE g.PostingDateMonth IS NOT NULL
+      ${siteId ? 'AND g.SiteId = ?' : ''}
     ORDER BY g.PostingDateMonth, s.SiteName, u.UtilityName
-  `).all();
+  `).all(...(siteId ? [siteId] : []));
 
   // Upsert on the natural key (site + utility + month) so a recalculated row
   // keeps its Id — and therefore its audit history — instead of being deleted
@@ -173,29 +358,48 @@ function calculateAll() {
   `);
 
   const results = [];
-  const dieselType = db
-    .prepare("SELECT Id FROM UtilityTypes WHERE UtilityName = 'Diesel'")
-    .get();
+  // Utility-type id lookup by name, used by the guaranteed-row pass below.
+  const utilityTypeByName = new Map(
+    db.prepare('SELECT Id, UtilityName FROM UtilityTypes').all().map((r) => [r.UtilityName, r])
+  );
   db.transaction(() => {
     const keptIds = [];
     // Track which site+month combos produced output so we can guarantee a
     // Diesel line (actual value or 0) for each of them below.
     const emittedSiteMonths = new Map(); // `${SiteId}|${month}` -> SiteName
     for (const c of combos) {
-      // Diesel is handled entirely by the guaranteed-row pass after this loop
-      // (a single row per site+month using its actual V1 value, or 0 when there
-      // is no data), so skip it here to avoid producing a duplicate Diesel row.
-      if (c.UtilityName === 'Diesel') continue;
+      const cfg = SITE_CONFIG[c.SiteName];
+      // Unknown sites and aggregate-mode sites (e.g. NRV) are not produced by
+      // this per-utility slot loop — aggregate sites run in their own pass below.
+      if (!cfg || cfg.mode === 'aggregate') continue;
+      // Utilities produced by the guaranteed-row pass (e.g. Köping Diesel) are
+      // emitted after this loop, so skip them here.
+      if (cfg.guaranteedRows && cfg.guaranteedRows.some((g) => g.utility === c.UtilityName)) continue;
+
       const cur = slotMap(c.SiteId, c.UtilityTypeId, c.PostingDateMonth);
       const prev = slotMap(c.SiteId, c.UtilityTypeId, prevMonth(c.PostingDateMonth));
+      // Delta utilities need a previous month baseline to be meaningful.
+      const isDelta = cfg.deltaUtilities && cfg.deltaUtilities.includes(c.UtilityName);
 
       // Each combo can produce one or more indicator rows (e.g. Water emits
       // several). Normalize every path to a list of { indicator, value, units, code }.
       let outputs;
 
-      // Manual / form-entry rows are already final values -> pass straight through.
-      const direct = directStmt.get(c.SiteId, c.UtilityTypeId, c.PostingDateMonth);
-      if (direct) {
+      // A site-specific formula takes precedence over everything (including a
+      // DIRECT form row) so its multiplier / mirrored discharge / correct
+      // indicator always applies regardless of how the data arrived. Anything
+      // not overridden falls back to the generic FORMULAS (Köping's defaults).
+      const siteFn = cfg.formulas && cfg.formulas[c.UtilityName];
+      const direct = siteFn ? null : directStmt.get(c.SiteId, c.UtilityTypeId, c.PostingDateMonth);
+      if (siteFn) {
+        if (isDelta && Object.keys(prev).length === 0) {
+          results.push({ ...c, skipped: true, reason: 'no baseline month' });
+          continue;
+        }
+        const res = siteFn({ cur, prev });
+        outputs = Array.isArray(res) ? res : [res];
+      } else if (direct) {
+        // Manual / form-entry rows are already final values -> pass straight through.
         // Skip if this form entry was already promoted via "Generate UL Pure"
         // (a Manual row exists) so we don't create a duplicate Calculated row.
         if (direct.SourceEntryId && manualExistsStmt.get(direct.SourceEntryId)) {
@@ -212,8 +416,7 @@ function calculateAll() {
         const fn = FORMULAS[c.UtilityName];
         if (!fn) { results.push({ ...c, skipped: true }); continue; }
 
-        // Delta-based utilities are unreliable without a baseline month.
-        if (DELTA_UTILITIES.has(c.UtilityName) && Object.keys(prev).length === 0) {
+        if (isDelta && Object.keys(prev).length === 0) {
           results.push({ ...c, skipped: true, reason: 'no baseline month' });
           continue;
         }
@@ -229,9 +432,10 @@ function calculateAll() {
           continue;
         }
 
-        // Round every stored value to 3 decimals so results are consistent
-        // (e.g. LPG 1680.2895 -> 1680.29) instead of carrying float tails.
-        const value = Math.round(o.value * 1000) / 1000;
+        // Round to the site's configured precision (e.g. Köping -> 3 decimals);
+        // sites with rounding: null keep their raw value.
+        const factor = cfg.rounding != null ? 10 ** cfg.rounding : null;
+        const value = factor ? Math.round(o.value * factor) / factor : o.value;
         // Official indicator name / id / units come from the metadata map when
         // the output has a known formula code; otherwise fall back to raw values.
         const meta = INDICATOR_META[o.code] || {};
@@ -284,27 +488,101 @@ function calculateAll() {
       }
     }
 
-    // Diesel has no meter formula. Guarantee exactly one Diesel indicator row
-    // per site+month, showing its actual V1 value when data exists (e.g. an
-    // entered/imported value) and 0 otherwise.
-    if (dieselType) {
-      const meta = INDICATOR_META.DIESEL_STD;
-      // Targets: every site+month that produced output, plus any month that
-      // actually has Diesel source data (so an entered value still shows).
-      const dieselTargets = new Map(emittedSiteMonths);
-      for (const c of combos) {
-        if (c.UtilityName === 'Diesel') {
-          dieselTargets.set(`${c.SiteId}|${c.PostingDateMonth}`, c.SiteName);
+    // ── Guaranteed rows ──
+    // Some utilities have no meter formula but must still emit exactly one row
+    // per active month — their raw slot value when data exists, otherwise 0
+    // (e.g. Köping Diesel). Driven entirely by each site's guaranteedRows config,
+    // so a new site only needs to list them; the engine never changes.
+    for (const [siteName, siteCfg] of Object.entries(SITE_CONFIG)) {
+      if (!siteCfg.guaranteedRows || siteCfg.guaranteedRows.length === 0) continue;
+      if (site && site !== siteName) continue; // respect the scoped run
+      for (const g of siteCfg.guaranteedRows) {
+        const ut = utilityTypeByName.get(g.utility);
+        if (!ut) continue;
+        const meta = INDICATOR_META[g.code] || {};
+        // Targets: every month this site produced output, plus any month that
+        // actually has this utility's source data (so an entered value shows).
+        const targets = new Map();
+        for (const [key, sName] of emittedSiteMonths) {
+          if (sName === siteName) targets.set(key, sName);
+        }
+        for (const c of combos) {
+          if (c.SiteName === siteName && c.UtilityName === g.utility) {
+            targets.set(`${c.SiteId}|${c.PostingDateMonth}`, c.SiteName);
+          }
+        }
+        for (const [key, sName] of targets) {
+          const [siteIdStr, month] = key.split('|');
+          const gSiteId = Number(siteIdStr);
+          const slots = slotMap(gSiteId, ut.Id, month);
+          const factor = g.round != null ? 10 ** g.round : null;
+          const raw = num(slots[g.slot]);
+          const value = factor ? Math.round(raw * factor) / factor : raw;
+          const existing = findCalcRow.get(gSiteId, ut.Id, month, g.code);
+          if (existing) {
+            if (Number(existing.Consumption) !== value) {
+              logChange({
+                tableName: 'UlpureData',
+                recordId: existing.Id,
+                fieldName: 'Consumption',
+                oldValue: existing.Consumption,
+                newValue: value,
+                changedBy: 'System (recalc)',
+              });
+            }
+            updateCalc.run({
+              id: existing.Id, utility: g.utility, site: sName, value,
+              units: meta.units, code: g.code, indicator: meta.name, indicatorId: meta.id,
+            });
+            keptIds.push(existing.Id);
+          } else {
+            const r = insertCalc.run({
+              month, utilityTypeId: ut.Id, siteId: gSiteId, utility: g.utility, site: sName,
+              value, previous: null, units: meta.units, code: g.code, indicator: meta.name, indicatorId: meta.id,
+            });
+            keptIds.push(r.lastInsertRowid);
+          }
+          results.push({ SiteId: gSiteId, SiteName: sName, PostingDateMonth: month, indicator: meta.name, value, units: meta.units });
         }
       }
-      for (const [key, siteName] of dieselTargets) {
-        const [siteIdStr, month] = key.split('|');
-        const siteId = Number(siteIdStr);
-        const slots = slotMap(siteId, dieselType.Id, month);
-        const value = Math.round(num(slots['V1']) * 1000) / 1000;
-        const existing = findCalcRow.get(siteId, dieselType.Id, month, 'DIESEL_STD');
+    }
+
+    // ── Aggregate-mode sites (e.g. NRV) ──
+    // Each summed utility = SUM(Consumption) of the site's rows matching its
+    // TemplateType/AccountNumber rule for the month, plus fixed constants. One
+    // line per utility per month (0 when no source rows).
+    // Any site with mode 'aggregate' in SITE_CONFIG runs here automatically.
+    for (const [siteName, siteCfg] of Object.entries(SITE_CONFIG)) {
+      if (siteCfg.mode !== 'aggregate') continue;
+      if (site && site !== siteName) continue; // respect the scoped run
+      const aggSite = db.prepare('SELECT Id FROM Sites WHERE SiteName = ?').get(siteName);
+      if (!aggSite) continue;
+
+      const aggMonths = db
+        .prepare("SELECT DISTINCT PostingDateMonth AS m FROM GtoInvoices WHERE SiteId = ? AND PostingDateMonth IS NOT NULL")
+        .all(aggSite.Id)
+        .map((r) => r.m);
+
+      const aggFind = db.prepare(`
+        SELECT Id, Consumption FROM UlpureData
+        WHERE SiteId = ? AND Utility = ? AND PostingDateMonth = ? AND DataSource = 'Calculated'
+        LIMIT 1
+      `);
+
+      // Hitl has been retired: every source row for the month is summed.
+      const sumStmts = (siteCfg.sumUtilities || []).map((s) => ({
+        s,
+        stmt: db.prepare(`
+          SELECT COALESCE(SUM(CAST(Consumption AS REAL)), 0) AS total
+          FROM GtoInvoices
+          WHERE SiteId = @siteId AND PostingDateMonth = @month AND (${s.where})
+        `),
+      }));
+
+      const upsertAgg = (month, utility, code, value, units, id, name) => {
+        const existing = aggFind.get(aggSite.Id, utility, month);
         if (existing) {
-          if (Number(existing.Consumption) !== value) {
+          if (String(existing.Consumption) !== String(value)) {
             logChange({
               tableName: 'UlpureData',
               recordId: existing.Id,
@@ -314,46 +592,47 @@ function calculateAll() {
               changedBy: 'System (recalc)',
             });
           }
-          updateCalc.run({
-            id: existing.Id,
-            utility: 'Diesel',
-            site: siteName,
-            value,
-            units: meta.units,
-            code: 'DIESEL_STD',
-            indicator: meta.name,
-            indicatorId: meta.id,
-          });
+          updateCalc.run({ id: existing.Id, utility, site: siteName, value, units, code, indicator: name, indicatorId: id });
           keptIds.push(existing.Id);
         } else {
           const r = insertCalc.run({
-            month,
-            utilityTypeId: dieselType.Id,
-            siteId,
-            utility: 'Diesel',
-            site: siteName,
-            value,
-            previous: null,
-            units: meta.units,
-            code: 'DIESEL_STD',
-            indicator: meta.name,
-            indicatorId: meta.id,
+            month, utilityTypeId: null, siteId: aggSite.Id, utility, site: siteName,
+            value, previous: null, units, code, indicator: name, indicatorId: id,
           });
           keptIds.push(r.lastInsertRowid);
         }
-        results.push({ SiteId: siteId, SiteName: siteName, PostingDateMonth: month, indicator: meta.name, value, units: meta.units });
+        results.push({ SiteId: aggSite.Id, SiteName: siteName, PostingDateMonth: month, indicator: name, value, units });
+      };
+
+      for (const month of aggMonths) {
+        for (const { s, stmt } of sumStmts) {
+          let value = stmt.get({ siteId: aggSite.Id, month }).total || 0;
+          if (s.round != null) {
+            const f = 10 ** s.round;
+            value = Math.round(value * f) / f;
+          }
+          upsertAgg(month, s.utility, s.code, value, s.units, s.id, s.name);
+        }
+        for (const k of (siteCfg.constants || [])) {
+          upsertAgg(month, k.utility, k.code, k.value, k.units, k.id, k.name);
+        }
       }
     }
 
     // Prune calculated rows that no longer produced a value this run (e.g. a
-    // month that became skipped). Manual rows are never touched.
+    // month that became skipped). Manual rows are never touched, and when a
+    // site filter is active only that site's Calculated rows are pruned.
+    const siteClause = siteId ? ' AND SiteId = ?' : '';
+    const siteArg = siteId ? [siteId] : [];
     if (keptIds.length > 0) {
       const placeholders = keptIds.map(() => '?').join(',');
       db.prepare(
-        `DELETE FROM UlpureData WHERE DataSource = 'Calculated' AND Id NOT IN (${placeholders})`
-      ).run(...keptIds);
+        `DELETE FROM UlpureData WHERE DataSource = 'Calculated' AND Id NOT IN (${placeholders})${siteClause}`
+      ).run(...keptIds, ...siteArg);
     } else {
-      db.prepare("DELETE FROM UlpureData WHERE DataSource = 'Calculated'").run();
+      db.prepare(
+        `DELETE FROM UlpureData WHERE DataSource = 'Calculated'${siteClause}`
+      ).run(...siteArg);
     }
   })();
 

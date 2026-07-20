@@ -2,11 +2,13 @@ const db = require('../config/db');
 const { logFieldChanges } = require('./auditService');
 
 // ------------------------------------------------------------------ //
-// FormEntries -> GtoInvoices bridge                                    //
-// Each manual form entry is a single, final meter reading. It lands   //
-// in GtoInvoices as one V1 row tagged DataSource='FormEntry' with a    //
-// DIRECT (pass-through) formula so the calc engine echoes it straight  //
-// into UlpureData without applying meter-delta math.                   //
+// Consolidated entry model                                            //
+// FormEntries is retired: manual form entries are written directly    //
+// into the single GtoInvoices landing table (the same table the bot   //
+// imports into and the calc engine reads). A manual entry is a single //
+// already-final meter reading, tagged DataSource='FormEntry' with a   //
+// DIRECT (pass-through) formula so the calc engine echoes it straight //
+// into UlpureData without applying meter-delta math.                  //
 // ------------------------------------------------------------------ //
 const resolveSiteId = (siteName) => {
   if (!siteName) return null;
@@ -22,232 +24,229 @@ const resolveUtilityId = (utilityName) => {
   return row ? row.Id : null;
 };
 
-const syncFormEntryToGtoInvoices = (formEntry) => {
-  if (!formEntry) return;
+// Utilities that must run through a meter formula instead of DIRECT passthrough.
+const FORMULA_CODE_BY_UTILITY = {
+  Electricity: 'ELEC_STD',
+  'District Heating': 'DH_STD',
+  Water: 'WATER_NET',
+  LPG: 'LPG_STD',
+  Diesel: 'DIESEL_STD',
+  'Produced Units': 'PRODUCED_STD',
+};
 
-  const utilityName = formEntry.UtilityName || formEntry.UtilityCode || '';
-  const siteId = resolveSiteId(formEntry.SiteCode);
-  const utilityTypeId = resolveUtilityId(utilityName);
-  const consumption = Number(formEntry.Consumption) || 0;
+// Account/meter name -> ValueSlot used by the calc formulas. Must stay in sync
+// with ACCOUNT_VALUE_SLOT in scripts/importGtoInvoices.js. Single-value
+// utilities (LPG/Diesel/Produced Units) have no meter picker, so they fall back
+// to 'V1', which is the slot their formulas read.
+const ACCOUNT_VALUE_SLOT = {
+  // Electricity
+  'Elektricitet, totalt A+T kWh': 'V1',
+  'Elektricitet_billaddplatser_kWh': 'V2',
+  'Elektricitet, publik lastbilsladdare (T3) kWh': 'V3',
+  'Elektricitet_publik lastbilsladdare_(E)_kWh': 'V4',
+  'Elförbruk E-hallen kWh': 'V5',
+  // District Heating
+  'Huvudmätare_T_MWh': 'V1',
+  'Omk.rum_mätare_T_(nya mätaren_MWh)': 'V2',
+  'Kompressor_återvinning _VS 3_MWh': 'V3',
+  'Härdverk_T_MWh': 'V4',
+  '85148787_MWh': 'V5',
+  'Graddagsfaktor_Köping_SMHI': 'V6',
+  'Verklig_Energi_Patrik': 'V13',
+  // Water
+  '12812696_A_verkstad': 'V1',
+  '12812699_A_verkstad': 'V2',
+  '12812698_A_verkstad': 'V3',
+  '68511391_T_verkstad': 'V4',
+  '6919964_Kyltorn_T-härd': 'V9',
+  '6794762_Kyltorn_A-härd-borttagen': 'V10',
+  '78102820_nödkyla_ugn_6_KB02': 'V11',
+  '6 KB01': 'V12',
+  'GKN_Water': 'V15',
+  'Stena_Fosfateringsvatten': 'V16',
+  'Stena_Emulsioner': 'V17',
+  'E-hallen_förbrukning_m3': 'V18',
+  // single-value utilities
+  'LPG_Propane_Gasoline': 'V1',
+  'Produced Units': 'V1',
+};
 
-  // Utilities that must run through a meter formula instead of DIRECT passthrough.
-  const FORMULA_CODE_BY_UTILITY = {
-    Electricity: 'ELEC_STD',
-    'District Heating': 'DH_STD',
-    Water: 'WATER_NET',
-    LPG: 'LPG_STD',
-    Diesel: 'DIESEL_STD',
-    'Produced Units': 'PRODUCED_STD',
-  };
+const US_SITES = new Set(['RT100', 'MEC', 'Macungie', 'LVLC']);
+
+// Compute the ValueSlot a manual entry occupies. US sites can have several
+// meters for one utility in the same month; their formulas sum all slots, so
+// each meter gets a distinct, stable slot (its meter no, else a unique seed).
+// Köping uses its fixed meter-picker slot map.
+const resolveValueSlot = (siteCode, accountMeterNo, slotSeed) => {
+  if (US_SITES.has(siteCode)) {
+    return accountMeterNo || slotSeed;
+  }
+  return ACCOUNT_VALUE_SLOT[accountMeterNo] || 'V1';
+};
+
+// Aliased column list so fetch* return the field names the Validate page
+// expects. Site/facility/utility/meter are derived from existing columns:
+// SiteId -> SiteName, Facility, UtilityTypeId -> UtilityName (else TemplateType),
+// and AccountNumber. Invoice/validation/bot fields are surfaced for both bot
+// and manual rows so the single table drives the whole Validate view.
+const ENTRY_COLUMNS = `
+  g.Id AS Id,
+  s.SiteName AS SiteCode,
+  s.SiteName AS Site,
+  g.Facility AS FacilityCode,
+  COALESCE(u.UtilityName, g.TemplateType) AS UtilityName,
+  g.PostingDateMonth AS PostingMonth,
+  g.AccountNumber AS AccountMeterNo,
+  g.Units AS Units,
+  g.Consumption AS Consumption,
+  g.PreviousConsumption AS PreviousConsumption,
+  g.InvoiceDate AS InvoiceDate,
+  g.InvoiceNo AS InvoiceNo,
+  COALESCE(g.Status, 'Pending') AS Status,
+  g.BotStatus AS BotStatus,
+  g.ValidateUser AS ValidateUser,
+  g.ValidatorLoginTime AS ValidatorLoginTime,
+  g.Approver AS Approver,
+  g.Comments AS Comment,
+  g.CreatedBy AS CreatedBy,
+  g.CreatedAt AS CreatedAt,
+  g.ModifiedBy AS ModifiedBy,
+  g.ModifiedAt AS ModifiedAt,
+  g.DataSource AS DataSource
+`;
+
+const selectEntryById = (id) =>
+  db
+    .prepare(
+      `SELECT ${ENTRY_COLUMNS}
+       FROM GtoInvoices g
+       LEFT JOIN Sites s ON s.Id = g.SiteId
+       LEFT JOIN UtilityTypes u ON u.Id = g.UtilityTypeId
+       WHERE g.Id = ?`
+    )
+    .get(id);
+
+// Create Entry
+const insertFormEntry = (data) => {
+  const slotSeed = `E${Date.now()}`;
+  const siteCode = data.siteCode || '';
+  const utilityName = data.utilityName || data.utilityCode || '';
+  const accountMeterNo = data.accountMeterNo || '';
+  const valueSlot = resolveValueSlot(siteCode, accountMeterNo, slotSeed);
   const formulaCode = FORMULA_CODE_BY_UTILITY[utilityName] || 'DIRECT';
 
-  // Account/meter name -> ValueSlot used by the calc formulas. Must stay in
-  // sync with ACCOUNT_VALUE_SLOT in scripts/importGtoInvoices.js. Single-value
-  // utilities (LPG/Diesel/Produced Units) have no meter picker, so they fall
-  // back to 'V1', which is the slot their formulas read.
-  const ACCOUNT_VALUE_SLOT = {
-    // Electricity
-    'Elektricitet, totalt A+T kWh': 'V1',
-    'Elektricitet_billaddplatser_kWh': 'V2',
-    'Elektricitet, publik lastbilsladdare (T3) kWh': 'V3',
-    'Elektricitet_publik lastbilsladdare_(E)_kWh': 'V4',
-    'Elförbruk E-hallen kWh': 'V5',
-    // District Heating
-    'Huvudmätare_T_MWh': 'V1',
-    'Omk.rum_mätare_T_(nya mätaren_MWh)': 'V2',
-    'Kompressor_återvinning _VS 3_MWh': 'V3',
-    'Härdverk_T_MWh': 'V4',
-    '85148787_MWh': 'V5',
-    'Graddagsfaktor_Köping_SMHI': 'V6',
-    'Verklig_Energi_Patrik': 'V13',
-    // Water
-    '12812696_A_verkstad': 'V1',
-    '12812699_A_verkstad': 'V2',
-    '12812698_A_verkstad': 'V3',
-    '68511391_T_verkstad': 'V4',
-    '6919964_Kyltorn_T-härd': 'V9',
-    '6794762_Kyltorn_A-härd-borttagen': 'V10',
-    '78102820_nödkyla_ugn_6_KB02': 'V11',
-    '6 KB01': 'V12',
-    'GKN_Water': 'V15',
-    'Stena_Fosfateringsvatten': 'V16',
-    'Stena_Emulsioner': 'V17',
-    'E-hallen_förbrukning_m3': 'V18',
-    // single-value utilities
-    'LPG_Propane_Gasoline': 'V1',
-    'Produced Units': 'V1',
-  };
-  const valueSlot = ACCOUNT_VALUE_SLOT[formEntry.AccountMeterNo] || 'V1';
-
-  // Remove any prior GtoInvoices row this form entry produced (e.g. if the
-  // month/utility changed on update) so re-syncing stays idempotent.
-  db.prepare(
-    "DELETE FROM GtoInvoices WHERE SourceEntryId = ? AND DataSource = 'FormEntry'"
-  ).run(formEntry.Id);
-
-  // INSERT OR REPLACE upserts against UX_GtoInvoices_source
-  // (SiteId, UtilityTypeId, ValueSlot, PostingDateMonth) so a manual entry
-  // overrides any existing row for the same site/utility/month.
-  db.prepare(`
-    INSERT OR REPLACE INTO GtoInvoices
+  const stmt = db.prepare(`
+    INSERT INTO GtoInvoices
     (
-      SourceEntryId,
-      AccountNumber,
-      ValueSlot,
-      Consumption,
       PostingDateMonth,
+      AccountNumber,
+      Units,
+      Consumption,
+      Status,
+      CreatedBy,
+      PdfFile,
+      Comments,
+      InvoiceDate,
+      InvoiceNo,
+      BotStatus,
+      ValidateUser,
+      ValidatorLoginTime,
+      Approver,
       DataSource,
       UtilityTypeId,
       SiteId,
       TemplateType,
       Facility,
-      Units,
-      FormulaCode,
-      PdfFile
+      ValueSlot,
+      FormulaCode
     )
     VALUES
     (
-      @sourceEntryId,
-      @accountNumber,
-      @valueSlot,
-      @consumption,
       @postingMonth,
+      @accountNumber,
+      @units,
+      @consumption,
+      @status,
+      @createdBy,
+      @pdfFile,
+      @comment,
+      @invoiceDate,
+      @invoiceNo,
+      @botStatus,
+      @validateUser,
+      @validatorLoginTime,
+      @approver,
       'FormEntry',
       @utilityTypeId,
       @siteId,
       @templateType,
       @facility,
-      @units,
-      @formulaCode,
-      @pdfFile
-    )
-  `).run({
-    sourceEntryId: formEntry.Id,
-    accountNumber:
-      formEntry.AccountMeterNo || formEntry.EntryName || utilityName || '',
-    valueSlot,
-    consumption,
-    postingMonth: formEntry.PostingMonth || '',
-    utilityTypeId,
-    siteId,
-    templateType: utilityName,
-    facility: formEntry.FacilityCode || '',
-    units: formEntry.Units || '',
-    formulaCode,
-    pdfFile: formEntry.FileUrl || '',
-  });
-};
-
-// Create Entry
-const insertFormEntry = (data) => {
-  const entryNumber = `ENTRY-${Date.now()}`;
-
-  const stmt = db.prepare(`
-    INSERT INTO FormEntries
-    (
-      EntryNumber,
-      FacilityCode,
-      SiteCode,
-      EntryName,
-      UtilityCode,
-      UtilityName,
-      PostingMonth,
-      AccountMeterNo,
-      Units,
-      Consumption,
-      Status,
-      CreatedBy,
-      FileName,
-      FileUrl,
-      PdfUrl,
-      Comment,
-      FormValuesJson
-    )
-    VALUES
-    (
-      @entryNumber,
-      @facilityCode,
-      @siteCode,
-      @entryName,
-      @utilityCode,
-      @utilityName,
-      @postingMonth,
-      @accountMeterNo,
-      @units,
-      @consumption,
-      @status,
-      @createdBy,
-      @fileName,
-      @fileUrl,
-      @pdfUrl,
-      @comment,
-      @formValuesJson
+      @valueSlot,
+      @formulaCode
     )
   `);
 
   const result = stmt.run({
-    entryNumber,
-    facilityCode: data.facilityCode || '',
-    siteCode: data.siteCode || '',
-    entryName: data.entryName || '',
-    utilityCode: data.utilityCode || '',
-    utilityName: data.utilityName || data.utilityCode || '',
     postingMonth: data.postingMonth || '',
-    accountMeterNo: data.accountMeterNo || '',
+    accountNumber: accountMeterNo || utilityName || '',
     units: data.units || '',
-    consumption: data.consumption || '',
-    status: data.status || 'Pending',
+    consumption: Number(data.consumption) || 0,
+    status: data.status || 'Validated',
     createdBy: data.createdBy || 'frontend-user',
-    fileName: data.fileName || '',
-    fileUrl: data.fileUrl || '',
-    pdfUrl: data.pdfUrl || '',
+    pdfFile: data.fileUrl || '',
     comment: data.comment || '',
-    formValuesJson: data.formValuesJson || null,
+    invoiceDate: data.invoiceDate || null,
+    invoiceNo: data.invoiceNo || null,
+    botStatus: data.botStatus || 'Manual',
+    validateUser: data.validateUser || null,
+    validatorLoginTime: data.validatorLoginTime || null,
+    approver: data.approver || null,
+    utilityTypeId: resolveUtilityId(utilityName),
+    siteId: resolveSiteId(siteCode),
+    templateType: utilityName,
+    facility: data.facilityCode || '',
+    valueSlot,
+    formulaCode,
   });
 
-  const created = db
-    .prepare('SELECT * FROM FormEntries WHERE Id = ?')
-    .get(result.lastInsertRowid);
-  syncFormEntryToGtoInvoices(created);
-  return created;
+  return selectEntryById(result.lastInsertRowid);
 };
 
 // Get All Entries
 const fetchFormEntries = (query) => {
-  let sql = 'SELECT * FROM FormEntries WHERE 1=1';
+  let sql = `SELECT ${ENTRY_COLUMNS}
+       FROM GtoInvoices g
+       LEFT JOIN Sites s ON s.Id = g.SiteId
+       LEFT JOIN UtilityTypes u ON u.Id = g.UtilityTypeId
+       WHERE 1=1`;
   const params = [];
 
   if (query.facilityCode) {
-    sql += ' AND FacilityCode = ?';
+    sql += ' AND g.Facility = ?';
     params.push(query.facilityCode);
   }
 
   if (query.siteCode) {
-    sql += ' AND SiteCode = ?';
+    sql += ' AND s.SiteName = ?';
     params.push(query.siteCode);
   }
 
-  if (query.utilityCode) {
-    sql += ' AND UtilityCode = ?';
-    params.push(query.utilityCode);
-  }
-
   if (query.status) {
-    sql += ' AND Status = ?';
+    sql += " AND COALESCE(g.Status, 'Pending') = ?";
     params.push(query.status);
   }
+
+  sql += ' ORDER BY g.Id DESC';
 
   return db.prepare(sql).all(...params);
 };
 
 // Get Entry By Id
-const fetchFormEntryById = (id) => {
-  return db.prepare('SELECT * FROM FormEntries WHERE Id = ?').get(id);
-};
+const fetchFormEntryById = (id) => selectEntryById(id);
 
-// Change Status
+// Change Status (Approve from the Validate page)
 const changeFormEntryStatus = (id, status, changedBy) => {
-  const entry = db.prepare('SELECT * FROM FormEntries WHERE Id = ?').get(id);
+  const entry = db.prepare('SELECT * FROM GtoInvoices WHERE Id = ?').get(id);
   if (!entry) throw new Error('Entry not found');
 
   let finalStatus = status;
@@ -256,20 +255,20 @@ const changeFormEntryStatus = (id, status, changedBy) => {
   }
 
   logFieldChanges({
-    tableName: 'FormEntries',
+    tableName: 'GtoInvoices',
     recordId: id,
     oldRecord: entry,
     newFields: { Status: finalStatus },
     changedBy: changedBy || 'Unknown User',
   });
 
-  db.prepare('UPDATE FormEntries SET Status = ? WHERE Id = ?').run(finalStatus, id);
-  return db.prepare('SELECT * FROM FormEntries WHERE Id = ?').get(id);
+  db.prepare('UPDATE GtoInvoices SET Status = ?, ModifiedBy = ?, ModifiedAt = datetime(\'now\') WHERE Id = ?').run(finalStatus, changedBy || 'Unknown User', id);
+  return selectEntryById(id);
 };
 
-// Update Entry
+// Update Entry (Modify + Save from the Validate Details page)
 const updateFormEntry = (id, data) => {
-  const entry = db.prepare('SELECT * FROM FormEntries WHERE Id = ?').get(id);
+  const entry = db.prepare('SELECT * FROM GtoInvoices WHERE Id = ?').get(id);
 
   if (!entry) {
     throw new Error('Entry not found');
@@ -277,15 +276,35 @@ const updateFormEntry = (id, data) => {
 
   const changedBy = data.changedBy || data.modifiedBy || 'Unknown User';
 
-  const newValues = {
-    PostingMonth: data.postingMonth || entry.PostingMonth,
+  const alreadyValidated =
+    entry.Status === 'Validated' || entry.Status === 'Modified and Validated';
+
+  const nextValues = {
+    PostingDateMonth: data.postingMonth || entry.PostingDateMonth,
     Consumption: data.consumption || entry.Consumption,
-    Comment: data.comment || entry.Comment || '',
-    Status: 'Modified and Validated',
+    Comments: data.comment || entry.Comments || '',
+  };
+
+  const hasChanges =
+    String(nextValues.PostingDateMonth ?? '') !== String(entry.PostingDateMonth ?? '') ||
+    String(nextValues.Consumption ?? '') !== String(entry.Consumption ?? '') ||
+    String(nextValues.Comments ?? '') !== String(entry.Comments ?? '');
+
+  let nextStatus;
+  if (alreadyValidated) {
+    // Only downgrade to "Modified and Validated" when something actually changed.
+    nextStatus = hasChanges ? 'Modified and Validated' : entry.Status;
+  } else {
+    nextStatus = 'Validated';
+  }
+
+  const newValues = {
+    ...nextValues,
+    Status: nextStatus,
   };
 
   logFieldChanges({
-    tableName: 'FormEntries',
+    tableName: 'GtoInvoices',
     recordId: id,
     oldRecord: entry,
     newFields: newValues,
@@ -293,25 +312,25 @@ const updateFormEntry = (id, data) => {
   });
 
   db.prepare(`
-    UPDATE FormEntries
+    UPDATE GtoInvoices
     SET
-      PostingMonth = ?,
+      PostingDateMonth = ?,
       Consumption = ?,
-      Comment = ?,
+      Comments = ?,
       Status = ?,
+      ModifiedBy = ?,
       ModifiedAt = datetime('now')
     WHERE Id = ?
   `).run(
-    newValues.PostingMonth,
+    newValues.PostingDateMonth,
     newValues.Consumption,
-    newValues.Comment,
+    newValues.Comments,
     newValues.Status,
+    changedBy,
     id
   );
 
-  const updated = db.prepare('SELECT * FROM FormEntries WHERE Id = ?').get(id);
-  syncFormEntryToGtoInvoices(updated);
-  return updated;
+  return selectEntryById(id);
 };
 
 module.exports = {
@@ -320,5 +339,4 @@ module.exports = {
   fetchFormEntryById,
   changeFormEntryStatus,
   updateFormEntry,
-  syncFormEntryToGtoInvoices,
 };

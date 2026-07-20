@@ -42,7 +42,7 @@ const fetchCombinedUlPureHistory = (ulPureId) => {
   let formLogs = [];
   if (entry && entry.SourceEntryId) {
     formLogs = db
-      .prepare(`SELECT * FROM AuditLog WHERE TableName = 'FormEntries' AND RecordId = ?`)
+      .prepare(`SELECT * FROM AuditLog WHERE TableName = 'GtoInvoices' AND RecordId = ?`)
       .all(entry.SourceEntryId);
   }
 

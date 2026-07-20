@@ -165,7 +165,7 @@ function FormDetailsPage() {
           formValues.quantity ||
           formValues.producedQuantity ||
           '',
-        status: 'Pending',
+        status: 'Validated',
         createdBy: 'Bot_02',
         fileName: uploadedFileData.fileName,
         fileUrl: uploadedFileData.fileUrl,

@@ -125,6 +125,15 @@ function ValidatePage() {
   return sum + (Number.isFinite(value) ? value : 0);
 }, 0);
 
+  // Köping values are shown with at most 3 decimals; other sites keep their raw value.
+  const formatConsumption = (row) => {
+    const site = (row.site || '').trim().toLowerCase();
+    const isKoping = site === 'köping' || site === 'koping';
+    const value = Number(row.consumption);
+    if (!isKoping || !Number.isFinite(value)) return row.consumption;
+    return Math.round(value * 1000) / 1000;
+  };
+
   const handleReset = () => {
     setUtilityFilter('');
     setMonthFilter('');
@@ -132,42 +141,15 @@ function ValidatePage() {
     setStatusFilter('Pending');
   };
 
-  const handleValidate = async (row) => {
-    try {
-      const response = await fetch(
-        `${API_BASE_URL}/api/form-entries/${row.id}/status`,
-        {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            status: 'Validated',
-            changedBy: getCurrentUserName(),
-          }),
-        }
-      );
-
-      const result = await response.json();
-
-      if (!response.ok) {
-        throw new Error(result.message || 'Failed to update status');
-      }
-
-      setTableData((prev) =>
-        prev.map((item) =>
-          item.id === row.id
-            ? {
-                ...item,
-                status: result.Status || 'Validated',
-              }
-            : item
-        )
-      );
-    } catch (error) {
-      console.error('Validate error:', error.message);
-      alert(error.message || 'Failed to validate entry');
-    }
+  const handleValidate = (row) => {
+    navigate('/validate-details', {
+      state: {
+        selectedEntry: row,
+        selectedSite,
+        selectedFacility,
+        selectedEntryLabel: selectedEntry,
+      },
+    });
   };
 
   const handleOpenValidateDetails = (row) => {
@@ -429,7 +411,7 @@ function ValidatePage() {
                         <td className="px-4 py-4 text-[13px] text-black">{row.utility}</td>
                         <td className="px-4 py-4 text-[13px] text-black">{row.facility}</td>
                         <td className="px-4 py-4 text-[13px] text-black">{row.accountMeterNo}</td>
-                        <td className="px-4 py-4 text-[13px] text-black">{row.consumption}</td>
+                        <td className="px-4 py-4 text-[13px] text-black">{formatConsumption(row)}</td>
                         <td className="px-4 py-4 text-[13px] text-black">{row.units}</td>
                         <td className="px-4 py-4 text-[13px] text-black">{row.recordDate}</td>
 
@@ -637,7 +619,7 @@ function ValidatePage() {
             </div>
 
             <div className="p-5">
-              <HistoryPanel tableName="FormEntries" recordId={historyRow.id} />
+              <HistoryPanel tableName="GtoInvoices" recordId={historyRow.id} />
             </div>
           </div>
         </div>
