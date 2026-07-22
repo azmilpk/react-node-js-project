@@ -4,7 +4,7 @@ import TopNavbar from '../components/topnavbar/TopNavbar';
 import HistoryPanel from '../components/HistoryPanel';
 import { getCurrentUserName } from '../utils/currentUser';
 import { unitForUtility } from '../utils/units';
-import { API_BASE_URL } from '../config/api';
+import { API_BASE_URL, authFetch, getToken } from '../config/api';
 
 function AuditorValidatePage() {
   const navigate = useNavigate();
@@ -29,7 +29,7 @@ function AuditorValidatePage() {
     try {
       setLoading(true);
 
-      const response = await fetch(`${API_BASE_URL}/api/ul-pure-entries`);
+      const response = await authFetch(`${API_BASE_URL}/api/ul-pure-entries`);
       const result = await response.json();
 
       if (!response.ok) {
@@ -118,7 +118,7 @@ function AuditorValidatePage() {
     const markReviewed = async (row) => {
     setReviewedIds((prev) => new Set(prev).add(row.id));
     try {
-      await fetch(
+      await authFetch(
         `${API_BASE_URL}/api/ul-pure-entries/${row.id}/review`,
         {
           method: 'PUT',
@@ -139,7 +139,7 @@ function AuditorValidatePage() {
 
     const previewUrl = `${API_BASE_URL}/api/files/view?blobUrl=${encodeURIComponent(
       row.fileUrl
-    )}`;
+    )}&token=${encodeURIComponent(getToken() || '')}`;
 
        setPreviewFile({ ...row, previewUrl });
     setPreviewOpen(true);

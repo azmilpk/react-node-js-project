@@ -162,6 +162,10 @@ const setRegonId = db.prepare(
 );
 setRegonId.run('64854062', 'Köping');
 setRegonId.run('64854091', 'NRV');
+setRegonId.run('80262282', 'LVLC');
+setRegonId.run('64854089', 'Macungie');
+setRegonId.run('76109541', 'MEC');
+setRegonId.run('80262304', 'RT100');
 
 /* ------------------------------------------------------------------ *
  * Make UlpureData able to fully stand in for UlPureEntries:

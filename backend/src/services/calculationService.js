@@ -125,9 +125,10 @@ const waterWithDischarge = (useCode) => ({ cur }) => {
   ];
 };
 
-// US natural gas is metered in CCF (hundred cubic feet). 1 CCF ≈ 1.037 therms
-// and 1 therm = 0.0293071070172 MWh, so CCF -> MWh combines both factors.
-const NAT_GAS_CCF_TO_MWH = 1.037 * 0.0293071070172;
+// US natural gas: the metered value is converted straight to MWh with the
+// therm->MWh factor (1 unit = 1 therm; no CCF->therm 1.037 step), matching the
+// Volvo reference figures.
+const NAT_GAS_CCF_TO_MWH = 0.0293071070172;
 const KITCHEN_PROPANE_TO_LB = 4.24;
 
 // Official ESG indicator metadata, keyed by the formula code each output uses.
@@ -179,11 +180,14 @@ const NRV_SUM_UTILITIES = [
   { utility: 'RenewableElectricity', code: 'NRV_RENEW_ELEC', round: 3, id: '65418678', name: 'Renewable electricity produced and used on site - Process', units: 'kWh',
     where: "LOWER(TRIM(TemplateType)) LIKE '%renewable electrici%' AND LOWER(TRIM(AccountNumber)) LIKE '%solar pv array%'" },
   { utility: 'Naturalgas', code: 'NRV_NATGAS', round: 2, id: '65142759', name: 'Natural Gas - Process in Energy', units: 'MMBTU (US)',
-    where: "LOWER(TRIM(TemplateType)) = 'naturalgas'" },
+    where: "REPLACE(LOWER(TRIM(TemplateType)), ' ', '') = 'naturalgas'" },
+  // Diesel is split into Product Testing (AccountNumber contains 'powerbi', tolerant
+  // of the 'disel'/'diesel' spelling) and Internal Transports (every other diesel
+  // row) so no diesel row is ever dropped from both lines.
   { utility: 'Diesel', code: 'NRV_DIESEL', round: null, id: '68459062', name: 'Diesel, ULSD, USA - Internal Transports in Volume', units: 'US gallon',
-    where: "LOWER(TRIM(TemplateType)) = 'diesel' AND LOWER(TRIM(AccountNumber)) LIKE '%diesel ignition%'" },
+    where: "LOWER(TRIM(TemplateType)) = 'diesel' AND LOWER(TRIM(AccountNumber)) NOT LIKE '%powerbi%'" },
   { utility: 'DieselProductTest', code: 'NRV_DIESEL_PT', round: null, id: '68459053', name: 'Diesel, ULSD, USA - Product Testing in Volume', units: 'litre',
-    where: "LOWER(TRIM(TemplateType)) = 'diesel' AND LOWER(TRIM(AccountNumber)) LIKE '%disel powerbi%'" },
+    where: "LOWER(TRIM(TemplateType)) = 'diesel' AND LOWER(TRIM(AccountNumber)) LIKE '%powerbi%'" },
   { utility: 'Petrol', code: 'NRV_PETROL', round: null, id: '65208548', name: 'Petrol - Internal Transports in Volume', units: 'US gallon',
     where: "LOWER(TRIM(TemplateType)) = 'petrol'" },
   { utility: 'Propane', code: 'NRV_PROPANE', round: null, id: '65141619', name: 'LPG, Propane/gasol - Process in Volume', units: 'US gallon',
@@ -564,7 +568,7 @@ function calculateAll({ site } = {}) {
         .map((r) => r.m);
 
       const aggFind = db.prepare(`
-        SELECT Id, Consumption FROM UlpureData
+        SELECT Id, Consumption, ReviewStatus, UlpureStatus FROM UlpureData
         WHERE SiteId = ? AND Utility = ? AND PostingDateMonth = ? AND DataSource = 'Calculated'
         LIMIT 1
       `);
@@ -582,6 +586,13 @@ function calculateAll({ site } = {}) {
       const upsertAgg = (month, utility, code, value, units, id, name) => {
         const existing = aggFind.get(aggSite.Id, utility, month);
         if (existing) {
+          // Overwrite guard: never clobber a value an auditor has reviewed or
+          // edited/validated. Keep the row (so the prune step spares it) and skip.
+          if (existing.ReviewStatus === 'Reviewed' || existing.UlpureStatus === 'Validated') {
+            keptIds.push(existing.Id);
+            results.push({ SiteId: aggSite.Id, SiteName: siteName, PostingDateMonth: month, indicator: name, value: existing.Consumption, units, locked: true });
+            return;
+          }
           if (String(existing.Consumption) !== String(value)) {
             logChange({
               tableName: 'UlpureData',

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import TopNavbar from '../components/topnavbar/TopNavbar';
 import { unitForUtility } from '../utils/units';
-import { API_BASE_URL } from '../config/api';
+import { API_BASE_URL, authFetch } from '../config/api';
 
 function AuditorUlPurePage() {
   const navigate = useNavigate();
@@ -23,7 +23,7 @@ function AuditorUlPurePage() {
     try {
       setLoading(true);
 
-      const response = await fetch(`${API_BASE_URL}/api/ul-pure-entries`);
+      const response = await authFetch(`${API_BASE_URL}/api/ul-pure-entries`);
       const result = await response.json();
 
       if (!response.ok) {

@@ -2,7 +2,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { useState } from 'react';
 import TopNavbar from '../components/topnavbar/TopNavbar';
 import HistoryPanel from '../components/HistoryPanel';
-import { API_BASE_URL } from '../config/api';
+import { API_BASE_URL, authFetch, getToken } from '../config/api';
 
 function ValidateDetailsPage() {
   const navigate = useNavigate();
@@ -55,7 +55,7 @@ function ValidateDetailsPage() {
   };
 
   const previewUrl = selectedEntry?.fileUrl
-    ? `${API_BASE_URL}/api/files/view?blobUrl=${encodeURIComponent(selectedEntry.fileUrl)}`
+    ? `${API_BASE_URL}/api/files/view?blobUrl=${encodeURIComponent(selectedEntry.fileUrl)}&token=${encodeURIComponent(getToken() || '')}`
     : '';
 
   const goBackToValidate = () => {
@@ -81,7 +81,7 @@ const getAuthUser = () => {
 
       const entryId = selectedEntry?.id || selectedEntry?.Id;
 
-      const response = await fetch(
+      const response = await authFetch(
         `${API_BASE_URL}/api/form-entries/${entryId}`,
         {
           method: 'PUT',

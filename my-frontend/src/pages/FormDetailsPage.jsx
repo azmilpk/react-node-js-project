@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import TopNavbar from '../components/topnavbar/TopNavbar';
 import { formConfigBySiteUtility } from '../config/formConfig';
-import { API_BASE_URL } from '../config/api';
+import { API_BASE_URL, authFetch } from '../config/api';
 
 function FormDetailsPage() {
   const navigate = useNavigate();
@@ -133,7 +133,7 @@ function FormDetailsPage() {
         const fileFormData = new FormData();
         fileFormData.append('file', selectedFile);
 
-        const uploadResponse = await fetch(`${API_BASE_URL}/api/files/upload`, {
+        const uploadResponse = await authFetch(`${API_BASE_URL}/api/files/upload`, {
           method: 'POST',
           body: fileFormData,
         });
@@ -171,7 +171,7 @@ function FormDetailsPage() {
         fileUrl: uploadedFileData.fileUrl,
       };
 
-      const response = await fetch(`${API_BASE_URL}/api/form-entries`, {
+      const response = await authFetch(`${API_BASE_URL}/api/form-entries`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

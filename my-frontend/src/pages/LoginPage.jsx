@@ -55,6 +55,10 @@ function LoginPage() {
         })
       );
 
+      if (user.token) {
+        localStorage.setItem('authToken', user.token);
+      }
+
       if (actualRole === 'Auditor') {
          navigate('/auditor-ul-pure');
       } else if (actualRole === 'SiteOwner') {

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { API_BASE_URL } from '../config/api';
+import { API_BASE_URL, authFetch } from '../config/api';
 
 function HistoryPanel({ tableName, recordId }) {
   const [history, setHistory] = useState([]);
@@ -14,7 +14,7 @@ function HistoryPanel({ tableName, recordId }) {
   const fetchHistory = async () => {
     try {
       setLoading(true);
-      const response = await fetch(
+      const response = await authFetch(
         `${API_BASE_URL}/api/audit/${tableName}/${recordId}`
       );
       const result = await response.json();

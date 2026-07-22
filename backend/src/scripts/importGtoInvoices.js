@@ -98,16 +98,25 @@ const SITE_ACCOUNT_UTILITY = {
     'Kitchen Propane': 'Kitchen Propane',
     'Forklift Propane': 'Forklift Propane',
   },
-  Macungie: {
+    Macungie: {
     '26660': 'Propane',
     diesel_hvo_transport: 'HVO Diesel Transport',
     diesel_hvo_process: 'HVO 100 Process',
-    // TODO: Natural Gas, Electricity, Gasoline, Water, Produced Units accounts
+    '411004428081': 'Natural Gas',
+    '411007180994': 'Natural Gas',
+    '421000145191': 'Natural Gas',
+    '99852-20147': 'Electricity',
+    '71061': 'Water',
+    Gasoline: 'Gasoline',
+    'Produced units': 'Produced Units',
   },
   LVLC: {
     '28580': 'Propane',
     '39521-50018': 'Electricity',
-    // TODO: Natural Gas, Water accounts
+    '64123-45027': 'Electricity',
+    '84973-54004': 'Electricity',
+    '411004272711': 'Natural Gas',
+    // No water at LVLC.
   },
 };
 

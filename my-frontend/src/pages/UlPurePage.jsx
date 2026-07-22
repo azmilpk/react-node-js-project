@@ -3,7 +3,8 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import TopNavbar from '../components/topnavbar/TopNavbar';
 import { unitForUtility } from '../utils/units';
 import HistoryPanel from '../components/HistoryPanel';
-import { API_BASE_URL } from '../config/api';
+import { API_BASE_URL, authFetch } from '../config/api';
+import { regionFullName } from '../config/regionNames';
 
 function UlPurePage() {
   const navigate = useNavigate();
@@ -28,7 +29,7 @@ function UlPurePage() {
     try {
       setLoading(true);
 
-      const response = await fetch(`${API_BASE_URL}/api/ul-pure-entries`);
+      const response = await authFetch(`${API_BASE_URL}/api/ul-pure-entries`);
       const result = await response.json();
 
       if (!response.ok) {
@@ -66,11 +67,11 @@ function UlPurePage() {
           indicatorName: item.IndicatorName || item.indicatorName || '',
           indicatorId: item.IndicatorId || item.indicatorId || '-',
           consumption: (() => {
-            const raw = item.Consumption ?? item.consumption;
-            return raw !== null && raw !== undefined && raw !== ''
-              ? Number(raw).toFixed(3)
-              : '-';
-          })(),
+  const raw = item.Consumption ?? item.consumption;
+  if (raw === null || raw === undefined || raw === '') return '-';
+  const n = Number(raw);
+  return Number.isFinite(n) ? n.toFixed(3) : raw;
+})(),
           units: item.Units || item.units || unitForUtility(item.Utility || item.utility),
           regonId: item.RegonId || item.regonId || '-',
           postingMonth: item.PostingMonth || item.postingMonth || '-',
@@ -297,7 +298,7 @@ function UlPurePage() {
                     filteredData.map((row) => (
                       <tr key={row.id} className="border-b border-black/10 hover:bg-black/5">
                         <td className="px-4 py-4 text-[13px] text-black">{row.utility}</td>
-                        <td className="px-4 py-4 text-[13px] text-black">{row.site}</td>
+                        <td className="px-4 py-4 text-[13px] text-black">{regionFullName(row.site)}</td>
                         <td className="px-4 py-4 text-[13px] text-black">{row.consumption}</td>
                         <td className="px-4 py-4 text-[13px] text-black">{row.units}</td>
                         <td className="px-4 py-4 text-[13px] text-black">{row.regonId}</td>

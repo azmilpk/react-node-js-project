@@ -4,7 +4,7 @@ import TopNavbar from '../components/topnavbar/TopNavbar';
 import HistoryPanel from '../components/HistoryPanel';
 import { getCurrentUserName, getCurrentUserRole } from '../utils/currentUser';
 import { unitForUtility } from '../utils/units';
-import { API_BASE_URL } from '../config/api';
+import { API_BASE_URL, authFetch, getToken } from '../config/api';
 
 function ValidatePage() {
   const navigate = useNavigate();
@@ -44,7 +44,7 @@ function ValidatePage() {
     try {
       setLoading(true);
 
-      const response = await fetch(`${API_BASE_URL}/api/form-entries`);
+      const response = await authFetch(`${API_BASE_URL}/api/form-entries`);
       const result = await response.json();
 
       if (!response.ok) {
@@ -75,7 +75,7 @@ function ValidatePage() {
           facilityCode,
           siteCode,
           accountMeterNo: item.AccountMeterNo || item.accountMeterNo || '-',
-          consumption: item.Consumption || item.consumption || '-',
+          consumption: item.Consumption ?? item.consumption ?? 0,
           units: item.Units || item.units || unitForUtility(item.UtilityName || item.utilityName || item.UtilityCode || item.utilityCode),
           recordDate: item.PostingMonth || item.postingMonth || '-',
           postingMonth: item.PostingMonth || item.postingMonth || '-',
@@ -208,7 +208,7 @@ function ValidatePage() {
 
     const previewUrl = `${API_BASE_URL}/api/files/view?blobUrl=${encodeURIComponent(
       row.fileUrl
-    )}`;
+    )}&token=${encodeURIComponent(getToken() || '')}`;
 
     if (isExcelFile(row.fileUrl, row.fileName)) {
       window.open(previewUrl, '_blank', 'noopener,noreferrer');
@@ -231,7 +231,7 @@ function ValidatePage() {
     setConfirmOpen(false);
     setGenerating(true);
     try {
-      const response = await fetch(`${API_BASE_URL}/api/ul-pure-entries/generate`, {
+      const response = await authFetch(`${API_BASE_URL}/api/ul-pure-entries/generate`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -361,7 +361,7 @@ function ValidatePage() {
                   <option value="Pending">Pending</option>
                   <option value="Validated">Validated</option>
                   <option value="Modified and Validated">Modified and Validated</option>
-                  <option value="Rejected">Rejected</option>
+                  
                 </select>
               </div>
 

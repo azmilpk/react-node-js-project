@@ -17,6 +17,7 @@ const ulPureRoutes = require('./routes/ulPureRoutes');
 const auditRoutes = require('./routes/auditRoutes');   // ← ADD THIS
 
 const errorHandler = require('./middleware/errorHandler');
+const { authenticate } = require('./middleware/auth');
 const db = require('./config/db');
 const { getContainerClient } = require('./config/blob');
 
@@ -60,13 +61,13 @@ app.get('/api/test-blob', async (req, res) => {
   }
 });
 
-app.use('/api/sites', siteRoutes);
-app.use('/api/utilities', utilityRoutes);
-app.use('/api/form-entries', formEntryRoutes);
+app.use('/api/sites', authenticate, siteRoutes);
+app.use('/api/utilities', authenticate, utilityRoutes);
+app.use('/api/form-entries', authenticate, formEntryRoutes);
 app.use('/api/files', fileRoutes);
 app.use('/api/auth', authRoutes);
-app.use('/api/ul-pure-entries', ulPureRoutes);
-app.use('/api/audit', auditRoutes);   // ← ADD THIS
+app.use('/api/ul-pure-entries', authenticate, ulPureRoutes);
+app.use('/api/audit', authenticate, auditRoutes);   // ← ADD THIS
 
 app.use(errorHandler);
 

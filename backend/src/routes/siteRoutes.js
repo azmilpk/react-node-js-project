@@ -1,8 +1,11 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../config/db');
+const { getSites } = require('../controllers/siteController');
 
 // existing routes can stay above or below
+
+router.get('/', getSites);
 
 router.get('/:siteCode/utilities', (req, res) => {
   try {
