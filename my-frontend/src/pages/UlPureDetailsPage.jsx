@@ -69,7 +69,7 @@ function UlPureDetailsPage() {
   };
 
   return (
-    <div className="w-full h-screen bg-[#f5f5f5] flex flex-col">
+    <div className="w-full h-screen bg-[#fafaf9] flex flex-col">
       <TopNavbar />
 
       <main className="flex-1 overflow-y-auto px-3 py-4">

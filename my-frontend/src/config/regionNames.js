@@ -6,7 +6,7 @@ export const REGION_FULL_NAMES = {
   'LVLC': 'Lehigh Valley Logistics Center',
   'Macungie': 'Macungie',
   'MEC': 'Mack Experience Center',
-  'RT100': 'RT100',
+  'RT100': 'Route 100 Methods Lab',
 };
 
 export const regionFullName = (site) => REGION_FULL_NAMES[site] || site || '—';

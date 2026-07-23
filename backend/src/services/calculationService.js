@@ -105,6 +105,9 @@ const FORMULAS = {
   'Produced Units'({ cur }) {
     return { value: num(cur['V1']), units: 'units', code: 'PRODUCED_STD' };
   },
+  'ConstantValue_LPGPropGas'({ cur }) {
+    return { value: num(cur['V1']), units: 'units', code: 'CONSTANT_PROP_GAS_STD' };
+  },
 };
 
 // The helpers below build the per-utility formula functions used by SITE_CONFIG
@@ -146,6 +149,7 @@ const INDICATOR_META = {
   LPG_STD:      { id: '65141617', name: 'LPG_Indicator', units: 'MWh' },
   PRODUCED_STD: { id: '65245956', name: 'Gearbox', units: 'Number' },
   DIESEL_STD:   { id: '65143046', name: 'Diesel Volvo STD - Internal Transports in Energy', units: 'MWh' },
+  CONSTANT_PROP_GAS_STD: { id: '64854062', name: 'LPG, Propane/gasol - Renewable (%)', units: '%' },
 
   // ── US sites (RT100, MEC, Macungie, LVLC) — see SITE_FORMULAS above ──
   ELEC_PASS:          { id: '64885465', name: 'Purchased electricity - Process', units: 'kWh' },
@@ -240,6 +244,7 @@ const SITE_CONFIG = {
     deltaUtilities: ['District Heating', 'Water'],
     guaranteedRows: [
       { utility: 'Diesel', code: 'DIESEL_STD', slot: 'V1', round: 3 },
+      {utility: 'ConstantValue_LPGPropGas', code: 'CONSTANT_PROP_GAS_STD', slot: 'V1', round: 3 },
     ],
   },
 
@@ -340,11 +345,11 @@ function calculateAll({ site } = {}) {
   // Upsert on the natural key (site + utility + month) so a recalculated row
   // keeps its Id — and therefore its audit history — instead of being deleted
   // and re-inserted with a fresh Id every run.
-  const findCalcRow = db.prepare(`
-    SELECT Id, Consumption FROM UlpureData
-    WHERE SiteId = ? AND UtilityTypeId = ? AND PostingDateMonth = ? AND DataSource = 'Calculated' AND FormulaCode = ?
-    LIMIT 1
-  `);
+ const findCalcRow = db.prepare(`
+  SELECT Id, Consumption, ReviewStatus, UlpureStatus FROM UlpureData
+  WHERE SiteId = ? AND UtilityTypeId = ? AND PostingDateMonth = ? AND DataSource = 'Calculated' AND FormulaCode = ?
+  LIMIT 1
+`);
 
   const insertCalc = db.prepare(`
     INSERT INTO UlpureData
@@ -447,8 +452,14 @@ function calculateAll({ site } = {}) {
         const indicatorId = meta.id || null;
         const units = meta.units || o.units;
 
-        const existing = findCalcRow.get(c.SiteId, c.UtilityTypeId, c.PostingDateMonth, o.code);
+         const existing = findCalcRow.get(c.SiteId, c.UtilityTypeId, c.PostingDateMonth, o.code);
         if (existing) {
+          // Never overwrite a value that's already been validated/reviewed for this month.
+          if (existing.ReviewStatus === 'Reviewed' || existing.UlpureStatus === 'Validated') {
+            keptIds.push(existing.Id);
+            results.push({ ...c, indicator: indicatorName, value: existing.Consumption, units, locked: true });
+            continue;
+          }
           // Record recalculated changes so they surface in the History panel.
           if (Number(existing.Consumption) !== value) {
             logChange({
@@ -522,8 +533,14 @@ function calculateAll({ site } = {}) {
           const factor = g.round != null ? 10 ** g.round : null;
           const raw = num(slots[g.slot]);
           const value = factor ? Math.round(raw * factor) / factor : raw;
-          const existing = findCalcRow.get(gSiteId, ut.Id, month, g.code);
+                    const existing = findCalcRow.get(gSiteId, ut.Id, month, g.code);
           if (existing) {
+            // Never overwrite a value that's already been validated/reviewed for this month.
+            if (existing.ReviewStatus === 'Reviewed' || existing.UlpureStatus === 'Validated') {
+              keptIds.push(existing.Id);
+              results.push({ SiteId: gSiteId, SiteName: sName, PostingDateMonth: month, indicator: meta.name, value: existing.Consumption, units: meta.units, locked: true });
+              continue;
+            }
             if (Number(existing.Consumption) !== value) {
               logChange({
                 tableName: 'UlpureData',
@@ -636,15 +653,24 @@ function calculateAll({ site } = {}) {
     const siteClause = siteId ? ' AND SiteId = ?' : '';
     const siteArg = siteId ? [siteId] : [];
     if (keptIds.length > 0) {
-      const placeholders = keptIds.map(() => '?').join(',');
-      db.prepare(
-        `DELETE FROM UlpureData WHERE DataSource = 'Calculated' AND Id NOT IN (${placeholders})${siteClause}`
-      ).run(...keptIds, ...siteArg);
-    } else {
-      db.prepare(
-        `DELETE FROM UlpureData WHERE DataSource = 'Calculated'${siteClause}`
-      ).run(...siteArg);
-    }
+  const placeholders = keptIds.map(() => '?').join(',');
+  db.prepare(
+    `DELETE FROM UlpureData
+     WHERE DataSource = 'Calculated'
+       AND Id NOT IN (${placeholders})
+       AND ReviewStatus != 'Reviewed'
+       AND UlpureStatus != 'Validated'
+       ${siteClause}`
+  ).run(...keptIds, ...siteArg);
+} else {
+  db.prepare(
+    `DELETE FROM UlpureData
+     WHERE DataSource = 'Calculated'
+       AND ReviewStatus != 'Reviewed'
+       AND UlpureStatus != 'Validated'
+       ${siteClause}`
+  ).run(...siteArg);
+}
   })();
 
   return results;

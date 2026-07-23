@@ -1,21 +1,74 @@
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import TopNavbar from '../components/topnavbar/TopNavbar';
+import { logoutUser } from '../utils/auth';
+import { API_BASE_URL, authFetch } from '../config/api';
 
 function ProfilePage() {
   const navigate = useNavigate();
-  const user = JSON.parse(localStorage.getItem('authUser'));
+  const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchProfile();
+  }, []);
+
+  const fetchProfile = async () => {
+    try {
+      setLoading(true);
+      const response = await authFetch(`${API_BASE_URL}/api/auth/me`);
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || 'Failed to load profile');
+      }
+
+      setUser(data);
+    } catch (error) {
+      console.error('Profile fetch error:', error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleLogout = async () => {
+    try {
+      await authFetch(`${API_BASE_URL}/api/auth/logout`, {
+        method: 'POST',
+      });
+    } catch (error) {
+      console.error('Logout error:', error.message);
+    } finally {
+      logoutUser();
+      navigate('/');
+    }
+  };
+
+  const getRoleBadgeStyle = (role) => {
+    switch (role) {
+      case 'Admin':
+        return 'bg-purple-100 text-purple-800';
+      case 'Auditor':
+        return 'bg-blue-100 text-blue-800';
+      case 'SiteOwner':
+        return 'bg-green-100 text-green-800';
+      default:
+        return 'bg-gray-100 text-gray-800';
+    }
+  };
 
   return (
-    <div className="w-full h-screen bg-[#f5f5f5] flex flex-col overflow-hidden">
+    <div className="w-full h-screen bg-[#fafaf9] flex flex-col overflow-hidden">
       <TopNavbar />
 
       <main className="flex-1 min-h-0 overflow-y-auto px-4 py-4">
-        <section className="w-full max-w-[900px] mx-auto bg-white rounded-[18px] shadow-sm p-6">
-          <div className="flex items-center justify-between mb-6">
+        <section className="w-full max-w-[900px] mx-auto space-y-6">
+
+          {/* Header */}
+          <div className="flex items-center justify-between">
             <h1 className="text-[28px] sm:text-[36px] font-bold text-black">
               Profile
             </h1>
-
             <button
               type="button"
               onClick={() => navigate(-1)}
@@ -25,12 +78,103 @@ function ProfilePage() {
             </button>
           </div>
 
-          <div className="space-y-4 text-[15px] text-black">
-            <div><strong>Name:</strong> {user?.name || '-'}</div>
-            <div><strong>User ID:</strong> {user?.userId || '-'}</div>
-            <div><strong>Role:</strong> {user?.role || '-'}</div>
-            <div><strong>Application:</strong> TTI ENV IDP</div>
+          {/* Profile Info */}
+          <div className="bg-white rounded-[18px] shadow-sm p-6">
+            <h2 className="text-[18px] font-semibold text-black mb-5">
+              Account Information
+            </h2>
+
+            {loading ? (
+              <div className="text-[13px] text-black/50 py-4">
+                Loading profile...
+              </div>
+            ) : user ? (
+              <div className="space-y-4">
+                <div className="flex items-center gap-4 py-3 border-b border-black/10">
+                  <div className="w-[120px] text-[13px] font-semibold text-black/50">Name</div>
+                  <div className="text-[14px] text-black font-medium">{user.Name || '-'}</div>
+                </div>
+
+                <div className="flex items-center gap-4 py-3 border-b border-black/10">
+                  <div className="w-[120px] text-[13px] font-semibold text-black/50">Email</div>
+                  <div className="text-[14px] text-black">{user.Email || '-'}</div>
+                </div>
+
+                <div className="flex items-center gap-4 py-3 border-b border-black/10">
+                  <div className="w-[120px] text-[13px] font-semibold text-black/50">Role</div>
+                  <span className={`inline-flex items-center px-3 py-1 rounded-full text-[12px] font-semibold ${getRoleBadgeStyle(user.Role)}`}>
+                    {user.Role || '-'}
+                  </span>
+                </div>
+
+                {user.SiteCode && (
+                  <div className="flex items-center gap-4 py-3 border-b border-black/10">
+                    <div className="w-[120px] text-[13px] font-semibold text-black/50">Site</div>
+                    <div className="text-[14px] text-black">{user.SiteCode}</div>
+                  </div>
+                )}
+
+                {user.FacilityCode && (
+                  <div className="flex items-center gap-4 py-3 border-b border-black/10">
+                    <div className="w-[120px] text-[13px] font-semibold text-black/50">Facility</div>
+                    <div className="text-[14px] text-black">{user.FacilityCode}</div>
+                  </div>
+                )}
+
+                <div className="flex items-center gap-4 py-3">
+                  <div className="w-[120px] text-[13px] font-semibold text-black/50">Application</div>
+                  <div className="text-[14px] text-black">TTI ENV IDP</div>
+                </div>
+              </div>
+            ) : (
+              <div className="text-[13px] text-red-500 py-4">
+                Failed to load profile.
+              </div>
+            )}
           </div>
+
+          {/* Microsoft Account Note */}
+          <div className="bg-white rounded-[18px] shadow-sm p-6">
+            <h2 className="text-[18px] font-semibold text-black mb-2">
+              Password & Security
+            </h2>
+            <p className="text-[13px] text-black/60 mb-4">
+              Your account is managed through Microsoft. To change your password
+              or update security settings, visit your Microsoft account.
+            </p>
+            <a
+              href="https://myaccount.microsoft.com"
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-2 h-[42px] px-6 rounded-full border border-black/20 text-black text-[13px] font-semibold hover:bg-black hover:text-white transition duration-300"
+            >
+              <svg width="16" height="16" viewBox="0 0 21 21" fill="none">
+                <rect x="1" y="1" width="9" height="9" fill="#F25022"/>
+                <rect x="11" y="1" width="9" height="9" fill="#7FBA00"/>
+                <rect x="1" y="11" width="9" height="9" fill="#00A4EF"/>
+                <rect x="11" y="11" width="9" height="9" fill="#FFB900"/>
+              </svg>
+              Manage Microsoft Account
+            </a>
+          </div>
+
+          {/* Logout */}
+          <div className="bg-white rounded-[18px] shadow-sm p-6">
+            <h2 className="text-[18px] font-semibold text-black mb-2">
+              Session
+            </h2>
+            <p className="text-[13px] text-black/50 mb-4">
+              Logging out will clear your session and return you to the login page.
+            </p>
+            <button
+              type="button"
+              onClick={handleLogout}
+              className="h-[42px] px-6 rounded-full bg-red-600 text-white text-[13px] font-semibold hover:bg-red-700 transition duration-300"
+            >
+              Log Out
+            </button>
+          </div>
+
         </section>
       </main>
     </div>

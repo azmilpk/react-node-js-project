@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import TopNavbar from '../components/topnavbar/TopNavbar';
 import HistoryPanel from '../components/HistoryPanel';
-import { getCurrentUserName } from '../utils/currentUser';
 import { unitForUtility } from '../utils/units';
 import { API_BASE_URL, authFetch, getToken } from '../config/api';
 
@@ -16,8 +15,6 @@ function AuditorValidatePage() {
   const [tableData, setTableData] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  const [reviewedIds, setReviewedIds] = useState(new Set());
-
   const [historyRow, setHistoryRow] = useState(null);
   const [previewFile, setPreviewFile] = useState(null);
   const [previewOpen, setPreviewOpen] = useState(false);
@@ -25,11 +22,12 @@ function AuditorValidatePage() {
   useEffect(() => {
     fetchEntries();
   }, []);
+
   const fetchEntries = async () => {
     try {
       setLoading(true);
 
-      const response = await authFetch(`${API_BASE_URL}/api/ul-pure-entries`);
+      const response = await authFetch(`${API_BASE_URL}/api/form-entries`);
       const result = await response.json();
 
       if (!response.ok) {
@@ -37,19 +35,14 @@ function AuditorValidatePage() {
       }
 
       const mappedData = result.map((item) => {
-        const site =
-          item.FacilityCode ||
-          item.facilityCode ||
-          item.SiteCode ||
-          item.siteCode ||
-          '-';
+        const site = item.SiteCode || item.siteCode || '-';
 
         return {
           Id: item.Id || item.id,
           id: item.Id || item.id,
           entryNumber: item.EntryNumber || item.entryNumber,
           site,
-          siteCode: item.SiteCode || item.siteCode || '',
+          facility: item.FacilityCode || item.facilityCode || site,
           utility:
             item.UtilityName ||
             item.utilityName ||
@@ -57,25 +50,17 @@ function AuditorValidatePage() {
             item.utilityCode ||
             '-',
           accountMeterNo: item.AccountMeterNo || item.accountMeterNo || '-',
-          consumption: item.Consumption || item.consumption || '-',
-          units: item.Units || item.units || unitForUtility(item.Utility || item.utility),
-          postingMonth: item.PostingMonth || item.postingMonth || '-',
-          status: item.Status || item.status || 'Validate',
+          consumption: item.Consumption ?? item.consumption ?? 0,
+          units: item.Units || item.units || unitForUtility(item.UtilityName || item.utilityName || item.UtilityCode || item.utilityCode),
+          recordDate: item.PostingMonth || item.postingMonth || '-',
+          status: item.Status || item.status || 'Pending',
           fileName: item.FileName || item.fileName || 'No file uploaded',
           fileUrl: item.FileUrl || item.fileUrl || '',
           comment: item.Comment || item.comment || '',
-          reviewStatus: item.ReviewStatus || item.reviewStatus || 'Not Reviewed',
         };
       });
 
-         setTableData(mappedData);
-      setReviewedIds(
-        new Set(
-          mappedData
-            .filter((r) => r.reviewStatus === 'Reviewed')
-            .map((r) => r.id)
-        )
-      );
+      setTableData(mappedData);
     } catch (error) {
       console.error('Fetch entries error:', error.message);
     } finally {
@@ -115,22 +100,6 @@ function AuditorValidatePage() {
     return 'unknown';
   };
 
-    const markReviewed = async (row) => {
-    setReviewedIds((prev) => new Set(prev).add(row.id));
-    try {
-      await authFetch(
-        `${API_BASE_URL}/api/ul-pure-entries/${row.id}/review`,
-        {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ reviewedBy: getCurrentUserName() }),
-        }
-      );
-    } catch (e) {
-      console.error('Review save failed:', e.message);
-    }
-  };
-
   const handlePreview = (row) => {
     if (!row.fileUrl) {
       alert('No file available for this entry');
@@ -141,10 +110,8 @@ function AuditorValidatePage() {
       row.fileUrl
     )}&token=${encodeURIComponent(getToken() || '')}`;
 
-       setPreviewFile({ ...row, previewUrl });
+    setPreviewFile({ ...row, previewUrl });
     setPreviewOpen(true);
-
-    markReviewed(row);
   };
 
   const closePreview = () => {
@@ -152,13 +119,12 @@ function AuditorValidatePage() {
     setPreviewFile(null);
   };
 
-    const handleOpenHistory = (row) => {
+  const handleOpenHistory = (row) => {
     setHistoryRow(row);
-    markReviewed(row);
   };
 
   return (
-    <div className="w-full h-screen bg-[#f5f5f5] flex flex-col overflow-hidden">
+        <div className="w-full h-screen bg-[#fafaf9] flex flex-col overflow-hidden">
       <TopNavbar />
 
       <main className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden px-4 py-4">
@@ -188,23 +154,24 @@ function AuditorValidatePage() {
                     <th className="px-4 py-3 text-left text-[13px] font-semibold">Account/Meter No</th>
                     <th className="px-4 py-3 text-left text-[13px] font-semibold">Consumption</th>
                     <th className="px-4 py-3 text-left text-[13px] font-semibold">Units</th>
-                    <th className="px-4 py-3 text-left text-[13px] font-semibold">Posting Month</th>
-                    <th className="px-4 py-3 text-left text-[13px] font-semibold">Reviewed</th>
+                    <th className="px-4 py-3 text-left text-[13px] font-semibold">Record Date</th>
+                    <th className="px-4 py-3 text-left text-[13px] font-semibold">Check Status</th>
+                    <th className="px-4 py-3 text-left text-[13px] font-semibold">Validate Data</th>
                     <th className="px-4 py-3 text-left text-[13px] font-semibold">History</th>
-                    <th className="px-4 py-3 text-left text-[13px] font-semibold">Preview</th>
+                    <th className="px-4 py-3 text-left text-[13px] font-semibold">Download File</th>
                   </tr>
                 </thead>
 
                 <tbody>
                   {loading ? (
                     <tr>
-                      <td colSpan="9" className="px-4 py-8 text-center text-[13px] text-black/60">
+                      <td colSpan="10" className="px-4 py-8 text-center text-[13px] text-black/60">
                         Loading...
                       </td>
                     </tr>
                   ) : filteredData.length > 0 ? (
                     filteredData.map((row) => {
-                      const isReviewed = reviewedIds.has(row.id);
+                      const isValidated = row.status === 'Validated' || row.status === 'Modified and Validated';
 
                       return (
                         <tr key={row.id} className="border-b border-black/10">
@@ -213,17 +180,29 @@ function AuditorValidatePage() {
                           <td className="px-4 py-4 text-[13px] text-black">{row.accountMeterNo}</td>
                           <td className="px-4 py-4 text-[13px] text-black">{row.consumption}</td>
                           <td className="px-4 py-4 text-[13px] text-black">{row.units}</td>
-                          <td className="px-4 py-4 text-[13px] text-black">{row.postingMonth}</td>
+                          <td className="px-4 py-4 text-[13px] text-black">{row.recordDate}</td>
 
                           <td className="px-4 py-4">
                             <span
                               className={`inline-flex items-center justify-center min-w-[100px] h-[32px] px-3 rounded-full text-[12px] font-semibold ${
-                                isReviewed
+                                isValidated
+                                  ? 'bg-blue-100 text-blue-700'
+                                  : 'bg-gray-200 text-black/70'
+                              }`}
+                            >
+                              {isValidated ? 'Validated' : 'Pending'}
+                            </span>
+                          </td>
+
+                          <td className="px-4 py-4">
+                            <span
+                              className={`inline-flex items-center justify-center min-w-[100px] h-[32px] px-3 rounded-full text-[12px] font-semibold ${
+                                isValidated
                                   ? 'bg-green-600 text-white'
                                   : 'bg-gray-300 text-black'
                               }`}
                             >
-                              {isReviewed ? 'Reviewed' : 'Not Reviewed'}
+                              {isValidated ? 'Validated' : 'Not Validated'}
                             </span>
                           </td>
 
@@ -242,6 +221,7 @@ function AuditorValidatePage() {
                               type="button"
                               onClick={() => handlePreview(row)}
                               className="h-[34px] px-4 rounded-full border border-black/20 text-black text-[12px] font-semibold hover:bg-black hover:text-white transition duration-300"
+                              title="Download / Preview file"
                             >
                               Preview
                             </button>
@@ -251,7 +231,7 @@ function AuditorValidatePage() {
                     })
                   ) : (
                     <tr>
-                      <td colSpan="9" className="px-4 py-8 text-center text-[13px] text-black/60">
+                      <td colSpan="10" className="px-4 py-8 text-center text-[13px] text-black/60">
                         No records found.
                       </td>
                     </tr>
@@ -341,7 +321,7 @@ function AuditorValidatePage() {
             </div>
 
             <div className="p-5">
-              <HistoryPanel tableName="UlPureEntries" recordId={historyRow.id} />
+              <HistoryPanel tableName="GtoInvoices" recordId={historyRow.id} />
             </div>
           </div>
         </div>

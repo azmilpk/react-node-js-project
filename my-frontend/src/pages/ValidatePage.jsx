@@ -20,7 +20,7 @@ function ValidatePage() {
 
   const [tableData, setTableData] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [utilityFilter, setUtilityFilter] = useState('');
+  const [utilityFilter, setUtilityFilter] = useState([]);
   const [monthFilter, setMonthFilter] = useState('');
   const [yearFilter, setYearFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('Pending');
@@ -75,6 +75,7 @@ function ValidatePage() {
           facilityCode,
           siteCode,
           accountMeterNo: item.AccountMeterNo || item.accountMeterNo || '-',
+           dataSource: item.DataSource || item.dataSource || '-',
           consumption: item.Consumption ?? item.consumption ?? 0,
           units: item.Units || item.units || unitForUtility(item.UtilityName || item.utilityName || item.UtilityCode || item.utilityCode),
           recordDate: item.PostingMonth || item.postingMonth || '-',
@@ -105,7 +106,7 @@ function ValidatePage() {
       const matchSite =
         !selectedSite || rowSite === normalizedSelectedSite;
 
-      const matchUtility = !utilityFilter || row.utility === utilityFilter;
+            const matchUtility = utilityFilter.length === 0 || utilityFilter.includes(row.utility);
       const matchMonth = !monthFilter || month === monthFilter;
       const matchYear = !yearFilter || year === yearFilter;
       const matchStatus = !statusFilter || row.status === statusFilter;
@@ -135,7 +136,7 @@ function ValidatePage() {
   };
 
   const handleReset = () => {
-    setUtilityFilter('');
+    setUtilityFilter([]);
     setMonthFilter('');
     setYearFilter('');
     setStatusFilter('Pending');
@@ -266,10 +267,10 @@ function ValidatePage() {
     }
   };
 
-  const utilityOptions = [...new Set(filteredData.map((row) => row.utility).filter(Boolean))];
+    const utilityOptions = [...new Set(tableData.map((row) => row.utility).filter(Boolean))];
 
   return (
-    <div className="w-full h-screen bg-[#f5f5f5] flex flex-col overflow-hidden">
+    <div className="w-full h-screen bg-[#fafaf9] flex flex-col overflow-hidden">
       <TopNavbar />
 
       <main className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden px-4 py-4">
@@ -385,6 +386,7 @@ function ValidatePage() {
                     <th className="px-4 py-3 text-left text-[13px] font-semibold">Utility</th>
                     <th className="px-4 py-3 text-left text-[13px] font-semibold">Facility</th>
                     <th className="px-4 py-3 text-left text-[13px] font-semibold">Account/Meter No</th>
+                    <th className="px-4 py-3 text-left text-[13px] font-semibold">Data Source</th>
                     <th className="px-4 py-3 text-left text-[13px] font-semibold">Consumption</th>
                     <th className="px-4 py-3 text-left text-[13px] font-semibold">Units</th>
                     <th className="px-4 py-3 text-left text-[13px] font-semibold">Record Date</th>
@@ -411,6 +413,7 @@ function ValidatePage() {
                         <td className="px-4 py-4 text-[13px] text-black">{row.utility}</td>
                         <td className="px-4 py-4 text-[13px] text-black">{row.facility}</td>
                         <td className="px-4 py-4 text-[13px] text-black">{row.accountMeterNo}</td>
+                         <td className="px-4 py-4 text-[13px] text-black">{row.dataSource}</td>
                         <td className="px-4 py-4 text-[13px] text-black">{formatConsumption(row)}</td>
                         <td className="px-4 py-4 text-[13px] text-black">{row.units}</td>
                         <td className="px-4 py-4 text-[13px] text-black">{row.recordDate}</td>

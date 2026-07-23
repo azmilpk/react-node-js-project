@@ -2,10 +2,13 @@ import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import TopNavbar from '../components/topnavbar/TopNavbar';
 import { unitForUtility } from '../utils/units';
+import { regionFullName } from '../config/regionNames';
 import { API_BASE_URL, authFetch } from '../config/api';
-
+import HistoryPanel from '../components/HistoryPanel';
+                        
 function AuditorUlPurePage() {
-  const navigate = useNavigate();
+    const navigate = useNavigate();
+  const LVO_SUBSITES = ['LVLC', 'MEC', 'RT100', 'Macungie'];
 
   const [tableData, setTableData] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -54,10 +57,11 @@ function AuditorUlPurePage() {
           regonId: item.RegonId || item.regonId || '-',
           indicatorName: item.IndicatorName || item.indicatorName || '',
           indicatorId: item.IndicatorId || item.indicatorId || '-',
-          consumption: (() => {
+                    consumption: (() => {
             const raw = item.Consumption ?? item.consumption;
-            return raw !== null && raw !== undefined && raw !== ''
-              ? Number(raw).toFixed(3)
+            const num = Number(raw);
+            return raw !== null && raw !== undefined && raw !== '' && Number.isFinite(num)
+              ? num.toFixed(3)
               : '-';
           })(),
           units: item.Units || item.units || unitForUtility(item.UtilityName || item.utilityName || item.UtilityCode || item.utilityCode),
@@ -113,6 +117,8 @@ function AuditorUlPurePage() {
   }, [tableData, siteFilter, utilityFilter, monthFilter, yearFilter]);
 
   const siteOptions = [...new Set(tableData.map((row) => row.site).filter(Boolean))];
+    const otherSiteOptions = siteOptions.filter((site) => !LVO_SUBSITES.includes(site));
+  const lvoSiteOptions = siteOptions.filter((site) => LVO_SUBSITES.includes(site));
   const utilityOptions = [...new Set(tableData.map((row) => row.utility).filter(Boolean))];
   const yearOptions = [
     ...new Set(
@@ -133,6 +139,7 @@ function AuditorUlPurePage() {
     setMonthFilter('');
     setYearFilter('');
   };
+    const [historyRow, setHistoryRow] = useState(null);
 
   const handleReview = (row) => {
     navigate('/auditor-validate-data', {
@@ -145,7 +152,7 @@ function AuditorUlPurePage() {
   };
 
   return (
-    <div className="w-full h-screen bg-[#f5f5f5] flex flex-col overflow-hidden">
+    <div className="w-full h-screen bg-[#fafaf9] flex flex-col overflow-hidden">
       <TopNavbar />
 
       <main className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden px-4 py-4">
@@ -166,7 +173,7 @@ function AuditorUlPurePage() {
 
           <div className="bg-white rounded-[18px] shadow-sm p-4 mb-6">
             <div className="grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
-              <div>
+                           <div>
                 <label className="block text-[13px] font-semibold text-black mb-2">
                   Site
                 </label>
@@ -176,11 +183,20 @@ function AuditorUlPurePage() {
                   className="w-full h-[42px] rounded-[12px] border border-black/20 px-4 bg-white text-[13px] outline-none"
                 >
                   <option value="">Find items</option>
-                  {siteOptions.map((site) => (
+                  {otherSiteOptions.map((site) => (
                     <option key={site} value={site}>
-                      {site}
+                      {regionFullName(site)}
                     </option>
                   ))}
+                  {lvoSiteOptions.length > 0 && (
+                    <optgroup label="LVO">
+                      {lvoSiteOptions.map((site) => (
+                        <option key={site} value={site}>
+                          {regionFullName(site)}
+                        </option>
+                      ))}
+                    </optgroup>
+                  )}
                 </select>
               </div>
 
@@ -271,13 +287,14 @@ function AuditorUlPurePage() {
                     <th className="px-4 py-3 text-left text-[13px] font-semibold">Indicator Id</th>
                     <th className="px-4 py-3 text-left text-[13px] font-semibold">Report Date</th>
                     <th className="px-4 py-3 text-left text-[13px] font-semibold">Validate</th>
+                    <th className="px-4 py-3 text-left text-[13px] font-semibold">History</th>
                   </tr>
                 </thead>
 
                 <tbody>
                   {loading ? (
                     <tr>
-                      <td colSpan="6" className="px-4 py-8 text-center text-[13px] text-black/60">
+                      <td colSpan="10" className="px-4 py-8 text-center text-[13px] text-black/60">
                         Loading...
                       </td>
                     </tr>
@@ -285,7 +302,7 @@ function AuditorUlPurePage() {
                                         filteredData.map((row) => (
                       <tr key={row.id} className="border-b border-black/10 hover:bg-black/5">
                         <td className="px-4 py-4 text-[13px] text-black">{row.utility}</td>
-                        <td className="px-4 py-4 text-[13px] text-black">{row.site}</td>
+                        <td className="px-4 py-4 text-[13px] text-black">{regionFullName(row.site)}</td>
                         <td className="px-4 py-4 text-[13px] text-black">{row.consumption}</td>
                         <td className="px-4 py-4 text-[13px] text-black">{row.units}</td>
                         <td className="px-4 py-4 text-[13px] text-black">{row.regonId}</td>
@@ -301,11 +318,21 @@ function AuditorUlPurePage() {
                             Review
                           </button>
                         </td>
+                       <td className="px-4 py-4">
+                          <button
+                            type="button"
+                            onClick={() => setHistoryRow(row)}
+                            className="h-[34px] px-4 rounded-full border border-black/20 text-black text-[12px] font-semibold hover:bg-black hover:text-white transition duration-300"
+                          >
+                            History
+                          </button>
+                        </td>
                       </tr>
                     ))
                   ) : (
+                    
                     <tr>
-                      <td colSpan="6" className="px-4 py-8 text-center text-[13px] text-black/60">
+                      <td colSpan="10" className="px-4 py-8 text-center text-[13px] text-black/60">
                         No data available.
                       </td>
                     </tr>
@@ -322,6 +349,31 @@ function AuditorUlPurePage() {
           </div>
         </section>
       </main>
+
+      {historyRow && (
+        <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4">
+          <div className="w-full max-w-3xl bg-white rounded-[20px] shadow-xl overflow-hidden">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-black/10">
+              <div>
+                <h2 className="text-[18px] font-bold text-black">Change History</h2>
+                <p className="text-[13px] text-black/60">
+                  {historyRow.utility} — {regionFullName(historyRow.site)}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setHistoryRow(null)}
+                className="min-w-[100px] h-[38px] px-4 rounded-full bg-black text-white text-[12px] font-semibold hover:bg-neutral-800 transition duration-300"
+              >
+                Close
+              </button>
+            </div>
+            <div className="p-5">
+              <HistoryPanel tableName="UlPureEntries" recordId={historyRow.id} />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

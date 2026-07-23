@@ -1,6 +1,6 @@
 const db = require('../config/db');
 const { logFieldChanges } = require('./auditService');
-const { calculateAll } = require('./calculationService');
+const { calculateAll, prevMonth } = require('./calculationService');
 
 // Aliased column list: returns UlpureData rows using the legacy UlPureEntries
 // field names so existing controllers / frontend keep working unchanged.
@@ -317,6 +317,45 @@ const clearUlPureEntries = () => {
 };
 
 
+const RAW_COLUMNS = `
+  Id, ValueSlot, Consumption, PostingDateMonth, Units,
+  AccountNumber, InvoiceNo, PdfFile, ValidateUser, Status, Comments, CreatedAt
+`;
+
+// Raw GtoInvoices rows that fed a specific Calculated UlpureData entry —
+// current month, plus the previous month (needed for delta utilities like
+// Water/District Heating; harmless to include for the rest).
+const fetchRawDataForUlPureEntry = (id) => {
+  const entry = db
+    .prepare('SELECT SiteId, UtilityTypeId, PostingDateMonth, Utility FROM UlpureData WHERE Id = ?')
+    .get(id);
+  if (!entry) {
+    const err = new Error('UL Pure entry not found');
+    err.status = 404;
+    throw err;
+  }
+
+  const rawStmt = db.prepare(`
+    SELECT ${RAW_COLUMNS} FROM GtoInvoices
+    WHERE SiteId = ? AND UtilityTypeId = ? AND PostingDateMonth = ?
+    ORDER BY ValueSlot
+  `);
+
+  const currentMonth = entry.PostingDateMonth;
+  const previousMonth = currentMonth ? prevMonth(currentMonth) : null;
+
+  return {
+    utility: entry.Utility,
+    currentMonth: {
+      month: currentMonth,
+      rows: currentMonth ? rawStmt.all(entry.SiteId, entry.UtilityTypeId, currentMonth) : [],
+    },
+    previousMonth: {
+      month: previousMonth,
+      rows: previousMonth ? rawStmt.all(entry.SiteId, entry.UtilityTypeId, previousMonth) : [],
+    },
+  };
+};
 
 module.exports = {
   insertUlPureEntryFromFormEntry,
@@ -326,4 +365,5 @@ module.exports = {
   updateUlPureEntry,
   markUlPureReviewed,
   clearUlPureEntries,
+  fetchRawDataForUlPureEntry,
 }; // ulPureService.js

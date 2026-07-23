@@ -59,6 +59,7 @@ const TEMPLATE_FORMULA = {
   Diesel: 'DIESEL_STD',
   LPG: 'LPG_STD',
   'Produced Units': 'PRODUCED_STD',
+  'ConstantValue_LPGPropGas': 'CONSTANT_PROP_GAS_STD',
 };
 
 // Excel `Templatetype` -> UtilityTypes.UtilityName (must match a seeded row).
@@ -69,6 +70,7 @@ const TEMPLATE_UTILITY = {
   Diesel: 'Diesel',
   LPG: 'LPG',
   'Produced Units': 'Produced Units',
+  'ConstantValue_LPGPropGas': 'ConstantValue_LPGPropGas',
 };
 
 // ─── PER-SITE (US) IMPORT MAPPING ────────────────────────────────────────────
@@ -224,7 +226,7 @@ const mapRow = (r) => {
     invoiceDate: toISODate(r.Invoicedate),
     postingDateMonth: r.Postingdatemonth || null,
     botStatus: r.Botstatus || null,
-    dataSource: r.Datasource || null,
+    dataSource: r.Datasource || 'Bot',
     utilityTypeId: utilityIdByName.get(utilityName) || null,
     siteId: siteIdByName.get(site) || null,
     templateType: templateType || null,

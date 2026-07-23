@@ -36,7 +36,7 @@ function FacilitySelectionPage() {
     [];
 
   return (
-    <div className="w-full h-screen bg-[#f5f5f5] flex flex-col overflow-hidden">
+    <div className="w-full h-screen bg-[#fafaf9] flex flex-col overflow-hidden">
       <TopNavbar />
 
       <main className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden flex justify-center px-4 py-4">

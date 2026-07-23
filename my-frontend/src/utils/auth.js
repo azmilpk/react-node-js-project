@@ -4,6 +4,7 @@ export const loginUser = (userData) => {
 
 export const logoutUser = () => {
   localStorage.removeItem('authUser');
+  localStorage.removeItem('authToken');
 };
 
 export const getAuthUser = () => {
@@ -13,4 +14,8 @@ export const getAuthUser = () => {
 
 export const isAuthenticated = () => {
   return !!getAuthUser();
+};
+
+export const getAuthToken = () => {
+  return localStorage.getItem('authToken');
 };
