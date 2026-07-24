@@ -25,10 +25,7 @@ function LoginPage() {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          email,
-          password,
-        }),
+        body: JSON.stringify({ email, password }),
       });
 
       const user = await response.json();
@@ -60,7 +57,7 @@ function LoginPage() {
       }
 
       if (actualRole === 'Auditor') {
-         navigate('/auditor-ul-pure');
+        navigate('/auditor-ul-pure');
       } else if (actualRole === 'SiteOwner') {
         navigate('/site-owner');
       } else {

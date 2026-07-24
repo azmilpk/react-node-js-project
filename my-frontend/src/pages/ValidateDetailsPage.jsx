@@ -148,14 +148,7 @@ const getAuthUser = () => {
                 <div className="overflow-hidden rounded-[14px] border border-black/10">
                   <table className="w-full border-collapse">
                     <tbody>
-                      <tr className="border-b border-black/10">
-                        <td className="px-4 py-3 text-[13px] font-semibold text-black bg-[#f8f8f8] w-[40%]">
-                          Entry No
-                        </td>
-                        <td className="px-4 py-3 text-[13px] text-black">
-                          {selectedEntry.entryNumber}
-                        </td>
-                      </tr>
+                      
 
                       <tr className="border-b border-black/10">
                         <td className="px-4 py-3 text-[13px] font-semibold text-black bg-[#f8f8f8]">
@@ -251,14 +244,6 @@ const getAuthUser = () => {
                         </td>
                       </tr>
 
-                      <tr>
-                        <td className="px-4 py-3 text-[13px] font-semibold text-black bg-[#f8f8f8]">
-                          File Name
-                        </td>
-                        <td className="px-4 py-3 text-[13px] text-black">
-                          {selectedEntry.fileName || 'No file uploaded'}
-                        </td>
-                      </tr>
                     </tbody>
                   </table>
                 </div>

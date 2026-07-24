@@ -5,7 +5,7 @@ git status
 git add .
 
 # 3. Commit with a message
-git commit -m "Add API_BASE_URL config, combined UL Pure history, fixes"
+git commit -m "Pushed the Updated code"
 
 # 4. Push to both remotes
 git push origin main

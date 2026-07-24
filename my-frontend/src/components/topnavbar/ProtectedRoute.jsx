@@ -2,25 +2,20 @@ import { Navigate } from 'react-router-dom';
 import { isAuthenticated, getAuthUser } from '../../utils/auth';
 
 function ProtectedRoute({ children, allowedRoles }) {
-  // Not logged in at all → back to home
+  // Check 1 — not logged in at all
   if (!isAuthenticated()) {
     return <Navigate to="/" replace />;
   }
 
-  // Role check — only if allowedRoles was specified
+  // Check 2 — wrong role
   if (allowedRoles && allowedRoles.length > 0) {
     const user = getAuthUser();
-    const userRole = user?.role;
+    const role = user?.role;
 
-    if (!userRole || !allowedRoles.includes(userRole)) {
-      // Logged in but wrong role → redirect to their correct home
-      if (userRole === 'Auditor') {
-        return <Navigate to="/auditor-ul-pure" replace />;
-      }
-      if (userRole === 'SiteOwner') {
-        return <Navigate to="/site-owner" replace />;
-      }
-      // Unknown role → back to home
+    if (!role || !allowedRoles.includes(role)) {
+      // Redirect to their correct home based on role
+      if (role === 'Auditor') return <Navigate to="/auditor-ul-pure" replace />;
+      if (role === 'SiteOwner') return <Navigate to="/site-owner" replace />;
       return <Navigate to="/" replace />;
     }
   }

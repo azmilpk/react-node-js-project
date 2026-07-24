@@ -1,41 +1,40 @@
+const jwt = require('jsonwebtoken');
 const authService = require('../services/authService');
 
-// POST /api/auth/login
-const login = async (req, res, next) => {
+const login = (req, res, next) => {
   try {
     const { email, password } = req.body;
-    const result = await authService.loginUser(email, password);
-    res.json(result);
+
+    const user = authService.loginUser(email, password);
+
+    if (!user) {
+      return res.status(401).json({ message: 'Invalid email or password' });
+    }
+
+    const token = jwt.sign(
+      {
+        id: user.Id,
+        email: user.Email,
+        role: user.Role,
+        name: user.Name,
+      },
+      process.env.JWT_SECRET || 'dev-secret-key',
+      { expiresIn: '8h' }
+    );
+
+    res.json({
+      Id: user.Id,
+      Name: user.Name,
+      Email: user.Email,
+      Role: user.Role,
+      SiteCode: user.SiteCode,
+      FacilityCode: user.FacilityCode,
+      token,
+    });
+
   } catch (error) {
     next(error);
   }
 };
 
-// POST /api/auth/logout
-const logout = (req, res) => {
-  res.json({ message: 'Logged out successfully' });
-};
-
-// GET /api/auth/me
-const getMe = (req, res) => {
-  try {
-    const db = require('../config/db');
-    const user = db
-      .prepare('SELECT Id, Name, Email, Role, SiteCode, FacilityCode FROM Users WHERE Id = ? AND IsActive = 1')
-      .get(req.user.id);
-
-    if (!user) {
-      return res.status(404).json({ message: 'User not found' });
-    }
-
-    res.json(user);
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
-};
-
-module.exports = {
-  login,
-  logout,
-  getMe,
-};
+module.exports = { login };

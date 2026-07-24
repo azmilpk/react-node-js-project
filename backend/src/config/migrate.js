@@ -86,6 +86,7 @@ db.exec(`
     UtilityTypeId INTEGER REFERENCES UtilityTypes(Id),
     SiteId INTEGER REFERENCES Sites(Id),
     TemplateType TEXT,
+    Site TEXT,
     Facility TEXT,
     Units TEXT,
     FormulaCode TEXT,
