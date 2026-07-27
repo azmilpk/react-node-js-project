@@ -5,7 +5,9 @@ import HistoryPanel from '../components/HistoryPanel';
 import { getCurrentUserName, getCurrentUserRole } from '../utils/currentUser';
 import { unitForUtility } from '../utils/units';
 import { API_BASE_URL, authFetch, getToken } from '../config/api';
+import { saveCache, loadCache, clearCache } from '../utils/pageCache';
 
+const CACHE_KEY = 'validatePage_cache';
 function ValidatePage() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -36,10 +38,32 @@ function ValidatePage() {
   const userRole = getCurrentUserRole();
   const isAuditor = userRole === 'Auditor';
 
-  useEffect(() => {
-    fetchEntries();
-  }, []);
+useEffect(() => {
+  const cached = loadCache(CACHE_KEY);
 
+  if (cached) {
+    // Restore everything from cache
+    setTableData(cached.data);
+    setUtilityFilter(cached.filters.utilityFilter || []);
+    setMonthFilter(cached.filters.monthFilter || '');
+    setYearFilter(cached.filters.yearFilter || '');
+    setStatusFilter(cached.filters.statusFilter || 'Pending');
+    setLoading(false);
+  } else {
+    // No cache — fetch fresh from backend
+    fetchEntries();
+  }
+}, []);
+useEffect(() => {
+  if (tableData.length > 0) {
+    saveCache(CACHE_KEY, tableData, {
+      utilityFilter,
+      monthFilter,
+      yearFilter,
+      statusFilter,
+    });
+  }
+}, [tableData, utilityFilter, monthFilter, yearFilter, statusFilter]);
   const fetchEntries = async () => {
     try {
       setLoading(true);
@@ -140,6 +164,8 @@ function ValidatePage() {
     setMonthFilter('');
     setYearFilter('');
     setStatusFilter('Pending');
+      clearCache(CACHE_KEY);
+  fetchEntries();
   };
 
   const handleValidate = (row) => {
@@ -249,7 +275,9 @@ function ValidatePage() {
       if (!response.ok) {
         throw new Error(result.message || 'Failed to generate UL Pure data');
       }
-
+         // Clear both caches — data changed in both tables
+    clearCache('validatePage_cache');
+    clearCache('ulPurePage_cache');
       alert(result.message || 'Modified and Validated entries moved successfully');
 
       navigate('/ul-pure', {

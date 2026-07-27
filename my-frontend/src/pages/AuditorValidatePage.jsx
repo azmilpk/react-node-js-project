@@ -4,6 +4,9 @@ import TopNavbar from '../components/topnavbar/TopNavbar';
 import HistoryPanel from '../components/HistoryPanel';
 import { unitForUtility } from '../utils/units';
 import { API_BASE_URL, authFetch, getToken } from '../config/api';
+import { saveCache, loadCache, clearCache } from '../utils/pageCache';
+
+const CACHE_KEY = 'auditorValidatePage_cache';
 
 function AuditorValidatePage() {
   const navigate = useNavigate();
@@ -20,8 +23,21 @@ function AuditorValidatePage() {
   const [previewOpen, setPreviewOpen] = useState(false);
 
   useEffect(() => {
-    fetchEntries();
+    const cached = loadCache(CACHE_KEY);
+
+    if (cached) {
+      setTableData(cached.data);
+      setLoading(false);
+    } else {
+      fetchEntries();
+    }
   }, []);
+
+  useEffect(() => {
+    if (tableData.length > 0) {
+      saveCache(CACHE_KEY, tableData, {});
+    }
+  }, [tableData]);
 
   const fetchEntries = async () => {
     try {

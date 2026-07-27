@@ -1,28 +1,48 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import TopNavbar from '../components/topnavbar/TopNavbar';
+import { saveCache, loadCache, clearAllPageCaches } from '../utils/pageCache';
 
 import addDataIcon from '../assets/siteownervectors/add_data.svg';
 import checkData1Icon from '../assets/siteownervectors/checkdata1.svg';
 import checkData2Icon from '../assets/siteownervectors/checkdata2.svg';
 
+const SITE_CACHE_KEY = 'siteOwner_selection';
+
 const siteOptions = {
   'Köping': ['Köping'],
   'NRV': ['NRV'],
   'LVO': ['LVLC', 'MEC', 'RT100', 'Macungie'],
-
 };
 
 function SiteOwnerPage() {
   const navigate = useNavigate();
 
-  const [selectedFacility, setSelectedFacility] = useState('');
-  const [selectedSite, setSelectedSite] = useState('');
+  // Load saved selection from cache on first render
+  const getSaved = () => {
+    const cached = loadCache(SITE_CACHE_KEY, 24 * 60 * 60 * 1000); // 24 hours
+    return cached?.data || { facility: '', site: '' };
+  };
+
+  const saved = getSaved();
+
+  const [selectedFacility, setSelectedFacility] = useState(saved.facility || '');
+  const [selectedSite, setSelectedSite] = useState(saved.site || '');
   const [error, setError] = useState('');
 
   const availableSubSites = selectedFacility
     ? siteOptions[selectedFacility] || []
     : [];
+
+  // Save selection to cache whenever it changes
+  useEffect(() => {
+    if (selectedFacility || selectedSite) {
+      saveCache(SITE_CACHE_KEY, {
+        facility: selectedFacility,
+        site: selectedSite,
+      });
+    }
+  }, [selectedFacility, selectedSite]);
 
   const handleFacilityChange = (e) => {
     const value = e.target.value;
@@ -30,6 +50,7 @@ function SiteOwnerPage() {
 
     setSelectedFacility(value);
     setError('');
+    clearAllPageCaches();
 
     if (subSites.length === 1) {
       setSelectedSite(subSites[0]);
@@ -38,6 +59,12 @@ function SiteOwnerPage() {
     } else {
       setSelectedSite('');
     }
+  };
+
+  const handleSiteChange = (e) => {
+    setSelectedSite(e.target.value);
+    setError('');
+    clearAllPageCaches();
   };
 
   const getEntryValue = () => {
@@ -50,9 +77,7 @@ function SiteOwnerPage() {
       setError('Please select both facility and site.');
       return;
     }
-
     setError('');
-
     navigate('/facility-selection', {
       state: {
         facility: selectedFacility,
@@ -67,9 +92,7 @@ function SiteOwnerPage() {
       setError('Please select both facility and site.');
       return;
     }
-
     setError('');
-
     navigate('/validate-data', {
       state: {
         facility: selectedFacility,
@@ -84,9 +107,7 @@ function SiteOwnerPage() {
       setError('Please select both facility and site.');
       return;
     }
-
     setError('');
-
     navigate('/ul-pure', {
       state: {
         facility: selectedFacility,
@@ -112,45 +133,42 @@ function SiteOwnerPage() {
             </p>
           </div>
 
-          <div className="flex flex-col md:flex-row flex-wrap justify-center gap-3 sm:gap-4 mb-6">
-            <select
-              value={selectedFacility}
-              onChange={handleFacilityChange}
-              className="w-full md:w-[340px] xl:w-[380px] h-[46px] sm:h-[30px] px-4 rounded-full border border-black/30 bg-white text-[14px] sm:text-[16px] outline-none"
-            >
-              <option value="">Select Facility</option>
-              {Object.keys(siteOptions).map((facility) => (
-                <option key={facility} value={facility}>
-                  {facility}
-                </option>
-              ))}
-            </select>
+         <div className="flex flex-col md:flex-row flex-wrap justify-center gap-3 sm:gap-4 mb-6">
+  <select
+    value={selectedFacility}
+    onChange={handleFacilityChange}
+    className="w-full md:w-[340px] xl:w-[380px] h-[46px] sm:h-[30px] px-4 rounded-full border border-black/30 bg-white text-[14px] sm:text-[16px] outline-none"
+  >
+    <option value="">Select Facility</option>
+    {Object.keys(siteOptions).map((facility) => (
+      <option key={facility} value={facility}>
+        {facility}
+      </option>
+    ))}
+  </select>
 
-            <select
-              value={selectedSite}
-              onChange={(e) => {
-                setSelectedSite(e.target.value);
-                setError('');
-              }}
-              disabled={!selectedFacility}
-              className="w-full md:w-[340px] xl:w-[380px] h-[46px] sm:h-[30px] px-4 rounded-full border border-black/30 bg-white text-[14px] sm:text-[16px] outline-none disabled:bg-gray-100 disabled:text-gray-400"
-            >
-              <option value="">
-                {selectedFacility ? 'Select Site' : 'Select Facility First'}
-              </option>
-              {availableSubSites.map((site) => (
-                <option key={site} value={site}>
-                  {site}
-                </option>
-              ))}
-            </select>
-          </div>
+  <select
+    value={selectedSite}
+    onChange={handleSiteChange}
+    disabled={!selectedFacility}
+    className="w-full md:w-[340px] xl:w-[380px] h-[46px] sm:h-[30px] px-4 rounded-full border border-black/30 bg-white text-[14px] sm:text-[16px] outline-none disabled:bg-gray-100 disabled:text-gray-400"
+  >
+    <option value="">
+      {selectedFacility ? 'Select Site' : 'Select Facility First'}
+    </option>
+    {availableSubSites.map((site) => (
+      <option key={site} value={site}>
+        {site}
+      </option>
+    ))}
+  </select>
+</div>
 
-          {error && (
-            <p className="text-center text-red-500 text-sm mb-4">
-              {error}
-            </p>
-          )}
+{error && (
+  <p className="text-center text-red-500 text-sm mb-4">
+    {error}
+  </p>
+)}
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6 max-w-[980px] mx-auto">
             <div className="bg-black rounded-[22px] px-4 py-5 min-h-[230px] flex flex-col items-center text-center">

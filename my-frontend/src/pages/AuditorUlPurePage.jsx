@@ -5,6 +5,9 @@ import { unitForUtility } from '../utils/units';
 import { regionFullName } from '../config/regionNames';
 import { API_BASE_URL, authFetch } from '../config/api';
 import HistoryPanel from '../components/HistoryPanel';
+import { saveCache, loadCache, clearCache } from '../utils/pageCache';
+
+const CACHE_KEY = 'auditorUlPurePage_cache';
                         
 function AuditorUlPurePage() {
     const navigate = useNavigate();
@@ -19,8 +22,30 @@ function AuditorUlPurePage() {
   const [yearFilter, setYearFilter] = useState('');
 
   useEffect(() => {
-    fetchUlPureEntries();
+    const cached = loadCache(CACHE_KEY);
+
+    if (cached) {
+      setTableData(cached.data);
+      setSiteFilter(cached.filters.siteFilter || '');
+      setUtilityFilter(cached.filters.utilityFilter || '');
+      setMonthFilter(cached.filters.monthFilter || '');
+      setYearFilter(cached.filters.yearFilter || '');
+      setLoading(false);
+    } else {
+      fetchUlPureEntries();
+    }
   }, []);
+
+  useEffect(() => {
+    if (tableData.length > 0) {
+      saveCache(CACHE_KEY, tableData, {
+        siteFilter,
+        utilityFilter,
+        monthFilter,
+        yearFilter,
+      });
+    }
+  }, [tableData, siteFilter, utilityFilter, monthFilter, yearFilter]);
 
   const fetchUlPureEntries = async () => {
     try {
@@ -138,6 +163,8 @@ function AuditorUlPurePage() {
     setUtilityFilter('');
     setMonthFilter('');
     setYearFilter('');
+    clearCache(CACHE_KEY);
+  fetchEntries();
   };
     const [historyRow, setHistoryRow] = useState(null);
 

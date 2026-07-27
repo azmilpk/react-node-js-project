@@ -170,18 +170,7 @@ function TopNavbar() {
                   Profile
                 </button>
 
-                <button
-                  type="button"
-                  onClick={() => {
-                    localStorage.clear();
-                    sessionStorage.clear();
-                    setProfileOpen(false);
-                    navigate('/');
-                  }}
-                  className="w-full text-left px-4 py-3 text-[13px] hover:bg-gray-100 transition"
-                >
-                  Logout
-                </button>
+               
               </div>
             )}
           </div>

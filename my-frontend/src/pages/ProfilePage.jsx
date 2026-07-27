@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import TopNavbar from '../components/topnavbar/TopNavbar';
 import { logoutUser } from '../utils/auth';
 import { API_BASE_URL, authFetch } from '../config/api';
+import { clearAllPageCaches } from '../utils/pageCache';
+
 
 function ProfilePage() {
   const navigate = useNavigate();
@@ -40,6 +42,7 @@ function ProfilePage() {
       console.error('Logout error:', error.message);
     } finally {
       logoutUser();
+      clearAllPageCaches();
       navigate('/');
     }
   };
