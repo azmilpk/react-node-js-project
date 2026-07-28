@@ -82,13 +82,12 @@ function AuditorUlPurePage() {
           regonId: item.RegonId || item.regonId || '-',
           indicatorName: item.IndicatorName || item.indicatorName || '',
           indicatorId: item.IndicatorId || item.indicatorId || '-',
-                    consumption: (() => {
-            const raw = item.Consumption ?? item.consumption;
-            const num = Number(raw);
-            return raw !== null && raw !== undefined && raw !== '' && Number.isFinite(num)
-              ? num.toFixed(3)
-              : '-';
-          })(),
+              consumption: (() => {
+  const raw = item.Consumption ?? item.consumption;
+  if (raw === null || raw === undefined || raw === '') return '-';
+  const n = Number(raw);
+  return Number.isFinite(n) ? String(n.toFixed(3)) : String(raw);
+})(),
           units: item.Units || item.units || unitForUtility(item.UtilityName || item.utilityName || item.UtilityCode || item.utilityCode),
           postingMonth: item.PostingMonth || item.postingMonth || '-',
           status: item.Status || item.status || 'Validate',

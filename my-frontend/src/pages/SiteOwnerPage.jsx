@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import TopNavbar from '../components/topnavbar/TopNavbar';
-import { saveCache, loadCache, clearAllPageCaches } from '../utils/pageCache';
+import { savePersistentCache,loadPersistentCache, clearAllPageCaches } from '../utils/pageCache';
 
 import addDataIcon from '../assets/siteownervectors/add_data.svg';
 import checkData1Icon from '../assets/siteownervectors/checkdata1.svg';
 import checkData2Icon from '../assets/siteownervectors/checkdata2.svg';
+import fileDashboardIcon from '../assets/siteownervectors/files.svg';
 
 const SITE_CACHE_KEY = 'siteOwner_selection';
 
@@ -20,7 +21,7 @@ function SiteOwnerPage() {
 
   // Load saved selection from cache on first render
   const getSaved = () => {
-    const cached = loadCache(SITE_CACHE_KEY, 24 * 60 * 60 * 1000); // 24 hours
+    const cached = loadPersistentCache(SITE_CACHE_KEY, 24 * 60 * 60 * 1000); // 24 hours
     return cached?.data || { facility: '', site: '' };
   };
 
@@ -37,7 +38,7 @@ function SiteOwnerPage() {
   // Save selection to cache whenever it changes
   useEffect(() => {
     if (selectedFacility || selectedSite) {
-      saveCache(SITE_CACHE_KEY, {
+      savePersistentCache(SITE_CACHE_KEY, {
         facility: selectedFacility,
         site: selectedSite,
       });
@@ -94,6 +95,20 @@ function SiteOwnerPage() {
     }
     setError('');
     navigate('/validate-data', {
+      state: {
+        facility: selectedFacility,
+        site: selectedSite,
+        entry: getEntryValue(),
+      },
+    });
+  };
+  const handleFileDashboard = () => {
+    if (!selectedFacility || !selectedSite) {
+      setError('Please select both facility and site.');
+      return;
+    }
+    setError('');
+    navigate('/file-dashboard', {
       state: {
         facility: selectedFacility,
         site: selectedSite,
@@ -222,6 +237,33 @@ function SiteOwnerPage() {
                 Get Started
               </button>
             </div>
+             <div className="bg-black rounded-[22px] px-4 py-5 min-h-[230px] flex flex-col items-center text-center">
+              <div className="w-[56px] h-[56px] rounded-full border border-white/20 flex items-center justify-center mb-4">
+                <img
+                  src={fileDashboardIcon}
+                  alt="File Dashboard"
+                  className="w-6 h-6 object-contain"
+                
+                />
+              </div>
+
+              <h3 className="text-white text-[19px] font-bold mb-2">
+                File Dashboard
+              </h3>
+
+              <p className="text-white/90 text-[12px] leading-5 max-w-[210px] mb-5">
+                Uploaded files, view their status.
+              </p>
+
+              <button
+                type="button"
+                onClick={handleFileDashboard}
+                className="mt-auto h-[36px] px-5 rounded-full border border-white bg-transparent text-white text-[12px] font-semibold hover:bg-white hover:text-black transition duration-300"
+              >
+                Get Started
+              </button>
+            </div>
+
 
             <div className="bg-black rounded-[22px] px-4 py-5 min-h-[230px] flex flex-col items-center text-center">
               <div className="w-[56px] h-[56px] rounded-full border border-white/20 flex items-center justify-center mb-4">

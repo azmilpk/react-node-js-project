@@ -4,7 +4,7 @@ export const REGION_FULL_NAMES = {
   'Köping': 'Köping',
   'NRV': 'New River Valley',
   'LVLC': 'Lehigh Valley Logistics Center',
-  'Macungie': 'Macungie',
+  'Macungie': 'Macungie Vehicle Assembly',
   'MEC': 'Mack Experience Center',
   'RT100': 'Route 100 Methods Lab',
 };

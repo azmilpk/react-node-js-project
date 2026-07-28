@@ -1,5 +1,8 @@
 const DEFAULT_TTL = 5 * 60 * 1000; // 5 minutes
 
+// ─── Page data cache (sessionStorage) ────────────────────────────────────────
+// Clears when browser is closed — page data should always be fresh next session
+
 export const saveCache = (key, data, filters = {}) => {
   try {
     const payload = {
@@ -7,23 +10,21 @@ export const saveCache = (key, data, filters = {}) => {
       filters,
       savedAt: Date.now(),
     };
-    localStorage.setItem(key, JSON.stringify(payload));
+    sessionStorage.setItem(key, JSON.stringify(payload));
   } catch (e) {
-    // localStorage full or unavailable — ignore
     console.warn('Cache save failed:', e);
   }
 };
 
 export const loadCache = (key, ttl = DEFAULT_TTL) => {
   try {
-    const raw = localStorage.getItem(key);
+    const raw = sessionStorage.getItem(key);
     if (!raw) return null;
 
     const parsed = JSON.parse(raw);
 
-    // Check if expired
     if (Date.now() - parsed.savedAt > ttl) {
-      localStorage.removeItem(key);
+      sessionStorage.removeItem(key);
       return null;
     }
 
@@ -34,7 +35,7 @@ export const loadCache = (key, ttl = DEFAULT_TTL) => {
 };
 
 export const clearCache = (key) => {
-  localStorage.removeItem(key);
+  sessionStorage.removeItem(key);
 };
 
 export const clearAllPageCaches = () => {
@@ -43,7 +44,42 @@ export const clearAllPageCaches = () => {
     'ulPurePage_cache',
     'auditorUlPurePage_cache',
     'auditorValidatePage_cache',
-    'siteOwnerPage_cache',
   ];
-  keys.forEach((key) => localStorage.removeItem(key));
+  keys.forEach((key) => sessionStorage.removeItem(key));
+};
+
+// ─── Persistent cache (sessionStorage) ───────────────────────────────────────
+// Also uses sessionStorage now — clears when browser closes
+export const savePersistentCache = (key, data) => {
+  try {
+    const payload = {
+      data,
+      savedAt: Date.now(),
+    };
+    sessionStorage.setItem(key, JSON.stringify(payload)); // ← sessionStorage
+  } catch (e) {
+    console.warn('Cache save failed:', e);
+  }
+};
+
+export const loadPersistentCache = (key, ttl = 24 * 60 * 60 * 1000) => {
+  try {
+    const raw = sessionStorage.getItem(key); // ← sessionStorage
+    if (!raw) return null;
+
+    const parsed = JSON.parse(raw);
+
+    if (Date.now() - parsed.savedAt > ttl) {
+      sessionStorage.removeItem(key);
+      return null;
+    }
+
+    return parsed;
+  } catch {
+    return null;
+  }
+};
+
+export const clearPersistentCache = (key) => {
+  sessionStorage.removeItem(key); // ← sessionStorage
 };

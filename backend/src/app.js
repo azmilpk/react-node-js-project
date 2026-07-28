@@ -15,6 +15,7 @@ const fileRoutes = require('./routes/fileRoutes');
 const authRoutes = require('./routes/authRoutes');
 const ulPureRoutes = require('./routes/ulPureRoutes');
 const auditRoutes = require('./routes/auditRoutes');   // ← ADD THIS
+const dashboardRoutes = require('./routes/dashboardRoutes');
 
 const errorHandler = require('./middleware/errorHandler');
 const { authenticate } = require('./middleware/auth');
@@ -68,6 +69,7 @@ app.use('/api/files', fileRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/ul-pure-entries', authenticate, ulPureRoutes);
 app.use('/api/audit', authenticate, auditRoutes);   // ← ADD THIS
+app.use('/api/dashboard', dashboardRoutes);
 
 app.use(errorHandler);
 

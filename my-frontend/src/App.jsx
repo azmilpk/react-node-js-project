@@ -12,6 +12,7 @@ import ProfilePage from './pages/ProfilePage';
 import AuditorUlPurePage from './pages/AuditorUlPurePage';
 import AuditorValidatePage from './pages/AuditorValidatePage';
 import ProtectedRoute from './components/topnavbar/ProtectedRoute';
+import DashboardPage from './pages/DashboardPage';
 
 function App() {
   return (
@@ -41,6 +42,11 @@ function App() {
         <Route path="/validate-data" element={
           <ProtectedRoute allowedRoles={['SiteOwner', 'Admin']}>
             <ValidatePage />
+          </ProtectedRoute>
+        } />
+        <Route path="/file-dashboard" element={
+          <ProtectedRoute allowedRoles={['SiteOwner', 'Admin']}>
+            <DashboardPage />
           </ProtectedRoute>
         } />
         <Route path="/validate-details" element={
