@@ -1,6 +1,31 @@
 const db = require('../config/db');
+const { getContainerClient } = require('../config/blob');
 
-const getDashboardData = (req, res, next) => {
+// Resolve the blob name (path within the container) from a stored PdfFile value,
+// which may be a full URL (https://acct.blob.../container/name) or a bare name.
+const resolveBlobName = (pdfFile) => {
+  try {
+    const parsed = new URL(pdfFile);
+    const parts = parsed.pathname.split('/').filter(Boolean);
+    return decodeURIComponent(parts.slice(1).join('/'));
+  } catch {
+    return pdfFile;
+  }
+};
+
+// True only when the invoice file is actually present in the blob container.
+const blobExists = async (containerClient, pdfFile) => {
+  if (!pdfFile || !pdfFile.trim()) return false;
+  try {
+    const blobName = resolveBlobName(pdfFile);
+    if (!blobName) return false;
+    return await containerClient.getBlobClient(blobName).exists();
+  } catch {
+    return false;
+  }
+};
+
+const getDashboardData = async (req, res, next) => {
   try {
     const { siteId, utilityTypeId, month, year, botStatus } = req.query;
 
@@ -8,23 +33,21 @@ const getDashboardData = (req, res, next) => {
       SELECT
         g.Id,
         g.AccountNumber,
-        g.ValueSlot,
         g.Consumption,
+        g.InvoiceDate,
         g.PostingDateMonth,
         g.BotStatus,
         g.DataSource,
+        g.Facility,
+        g.Units,
         g.PdfFile,
         g.InvoiceNo,
         g.CreatedAt,
-        g.Units,
-        g.Site,
-        g.Facility,
-        g.TemplateType,
         s.SiteName,
         u.UtilityName
       FROM GtoInvoices g
-      LEFT JOIN Sites s ON g.SiteId = s.Id
-      LEFT JOIN UtilityTypes u ON g.UtilityTypeId = u.Id
+      LEFT JOIN Sites s ON s.Id = g.SiteId
+      LEFT JOIN UtilityTypes u ON u.Id = g.UtilityTypeId
       WHERE 1=1
     `;
 
@@ -34,22 +57,18 @@ const getDashboardData = (req, res, next) => {
       sql += ' AND g.SiteId = ?';
       params.push(siteId);
     }
-
     if (utilityTypeId) {
       sql += ' AND g.UtilityTypeId = ?';
       params.push(utilityTypeId);
     }
-
     if (month) {
-      sql += " AND strftime('%m', g.PostingDateMonth) = ?";
+      sql += ' AND substr(g.PostingDateMonth, 6, 2) = ?';
       params.push(month);
     }
-
     if (year) {
-      sql += " AND strftime('%Y', g.PostingDateMonth) = ?";
+      sql += ' AND substr(g.PostingDateMonth, 1, 4) = ?';
       params.push(year);
     }
-
     if (botStatus) {
       sql += ' AND g.BotStatus = ?';
       params.push(botStatus);
@@ -59,44 +78,52 @@ const getDashboardData = (req, res, next) => {
 
     const rows = db.prepare(sql).all(...params);
 
-    // Add hasFile flag to each row
-    const mapped = rows.map((row) => ({
-      ...row,
-      hasFile: !!(row.PdfFile && row.PdfFile.trim() !== ''),
-    }));
+    // Reach the blob container once; if unavailable (e.g. local dev without Azure
+    // creds) fall back to "URL present" so the dashboard still works.
+    let containerClient = null;
+    try {
+      containerClient = getContainerClient();
+    } catch {
+      containerClient = null;
+    }
 
-    // Summary counts
-    const total = mapped.length;
-    const withFile = mapped.filter((r) => r.hasFile).length;
-    const withoutFile = total - withFile;
+    const entries = await Promise.all(
+      rows.map(async (row) => {
+        const hasUrl = !!(row.PdfFile && row.PdfFile.trim());
+        const hasFile = hasUrl
+          ? containerClient
+            ? await blobExists(containerClient, row.PdfFile)
+            : true
+          : false;
+        return { ...row, hasFile };
+      })
+    );
+
+    const total = entries.length;
+    const withFile = entries.filter((r) => r.hasFile).length;
 
     res.json({
-      summary: { total, withFile, withoutFile },
-      entries: mapped,
+      summary: { total, withFile, withoutFile: total - withFile },
+      entries,
     });
-
   } catch (error) {
     next(error);
   }
 };
 
-// Get all sites for filter dropdown
 const getDashboardSites = (req, res, next) => {
   try {
-    const sites = db.prepare('SELECT * FROM Sites ORDER BY SiteName').all();
-    res.json(sites);
+    const rows = db.prepare('SELECT Id, SiteName FROM Sites ORDER BY SiteName').all();
+    res.json(rows);
   } catch (error) {
     next(error);
   }
 };
 
-// Get all utilities for filter dropdown
 const getDashboardUtilities = (req, res, next) => {
   try {
-    const utilities = db
-      .prepare('SELECT * FROM UtilityTypes ORDER BY UtilityName')
-      .all();
-    res.json(utilities);
+    const rows = db.prepare('SELECT Id, UtilityName FROM UtilityTypes ORDER BY UtilityName').all();
+    res.json(rows);
   } catch (error) {
     next(error);
   }

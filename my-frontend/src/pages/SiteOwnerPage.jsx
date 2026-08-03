@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import TopNavbar from '../components/topnavbar/TopNavbar';
-import { savePersistentCache,loadPersistentCache, clearAllPageCaches } from '../utils/pageCache';
+import { savePersistentCache, loadPersistentCache, clearAllPageCaches } from '../utils/pageCache';
 
 import addDataIcon from '../assets/siteownervectors/add_data.svg';
 import checkData1Icon from '../assets/siteownervectors/checkdata1.svg';
@@ -18,6 +18,12 @@ const siteOptions = {
 
 function SiteOwnerPage() {
   const navigate = useNavigate();
+  const [isLoaded, setIsLoaded] = useState(false);
+
+  // Trigger animation after page mounts
+  useEffect(() => {
+    setIsLoaded(true);
+  }, []);
 
   // Load saved selection from cache on first render
   const getSaved = () => {
@@ -102,6 +108,7 @@ function SiteOwnerPage() {
       },
     });
   };
+
   const handleFileDashboard = () => {
     if (!selectedFacility || !selectedSite) {
       setError('Please select both facility and site.');
@@ -132,12 +139,39 @@ function SiteOwnerPage() {
     });
   };
 
+  const cardsData = [
+    {
+      title: 'Enter Data',
+      desc: 'Initiate a new Data entry. Add required details & documents.',
+      icon: addDataIcon,
+      action: handleEnterData,
+    },
+    {
+      title: 'Validate Data',
+      desc: 'Access entered Data, add notes & upload documents.',
+      icon: checkData1Icon,
+      action: handleValidateData,
+    },
+    {
+      title: 'File Dashboard',
+      desc: 'View uploaded files and track their status.',
+      icon: fileDashboardIcon,
+      action: handleFileDashboard,
+    },
+    {
+      title: 'UL Pure',
+      desc: 'Access validated data and reporting details.',
+      icon: checkData2Icon,
+      action: handleUlPure,
+    },
+  ];
+
   return (
     <div className="w-full h-screen bg-[#fafaf9] flex flex-col overflow-hidden">
       <TopNavbar />
 
       <main className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden flex justify-center px-4 py-4">
-        <section className="w-full max-w-[1040px] mx-auto">
+        <section className="w-full max-w-[1280px] mx-auto">
           <div className="text-center mb-5">
             <h1 className="text-[28px] sm:text-[36px] lg:text-[44px] xl:text-[48px] leading-tight font-bold text-black mb-2">
               Site Owner Login
@@ -148,148 +182,81 @@ function SiteOwnerPage() {
             </p>
           </div>
 
-         <div className="flex flex-col md:flex-row flex-wrap justify-center gap-3 sm:gap-4 mb-6">
-  <select
-    value={selectedFacility}
-    onChange={handleFacilityChange}
-    className="w-full md:w-[340px] xl:w-[380px] h-[46px] sm:h-[30px] px-4 rounded-full border border-black/30 bg-white text-[14px] sm:text-[16px] outline-none"
-  >
-    <option value="">Select Facility</option>
-    {Object.keys(siteOptions).map((facility) => (
-      <option key={facility} value={facility}>
-        {facility}
-      </option>
-    ))}
-  </select>
+          <div className="flex flex-col md:flex-row flex-wrap justify-center gap-3 sm:gap-4 mb-6">
+            <select
+              value={selectedFacility}
+              onChange={handleFacilityChange}
+              className="w-full md:w-[340px] xl:w-[380px] h-[28px] px-4 rounded-full border border-black/30 bg-white text-[14px] sm:text-[16px] outline-none"
+            >
+              <option value="">Select Facility</option>
+              {Object.keys(siteOptions).map((facility) => (
+                <option key={facility} value={facility}>
+                  {facility}
+                </option>
+              ))}
+            </select>
 
-  <select
-    value={selectedSite}
-    onChange={handleSiteChange}
-    disabled={!selectedFacility}
-    className="w-full md:w-[340px] xl:w-[380px] h-[46px] sm:h-[30px] px-4 rounded-full border border-black/30 bg-white text-[14px] sm:text-[16px] outline-none disabled:bg-gray-100 disabled:text-gray-400"
-  >
-    <option value="">
-      {selectedFacility ? 'Select Site' : 'Select Facility First'}
-    </option>
-    {availableSubSites.map((site) => (
-      <option key={site} value={site}>
-        {site}
-      </option>
-    ))}
-  </select>
-</div>
+            <select
+              value={selectedSite}
+              onChange={handleSiteChange}
+              disabled={!selectedFacility}
+              className="w-full md:w-[340px] xl:w-[380px] h-[28px] px-4 rounded-full border border-black/30 bg-white text-[14px] sm:text-[16px] outline-none disabled:bg-gray-100 disabled:text-gray-400"
+            >
+              <option value="">
+                {selectedFacility ? 'Select Site' : 'Select Facility First'}
+              </option>
+              {availableSubSites.map((site) => (
+                <option key={site} value={site}>
+                  {site}
+                </option>
+              ))}
+            </select>
+          </div>
 
-{error && (
-  <p className="text-center text-red-500 text-sm mb-4">
-    {error}
-  </p>
-)}
+          {error && (
+            <p className="text-center text-red-500 text-sm mb-4">
+              {error}
+            </p>
+          )}
 
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6 max-w-[980px] mx-auto">
-            <div className="bg-black rounded-[22px] px-4 py-5 min-h-[230px] flex flex-col items-center text-center">
-              <div className="w-[56px] h-[56px] rounded-full border border-white/20 flex items-center justify-center mb-4">
-                <img
-                  src={addDataIcon}
-                  alt="Enter Data"
-                  className="w-6 h-6 object-contain"
-                />
-              </div>
-
-              <h3 className="text-white text-[19px] font-bold mb-2">
-                Enter Data
-              </h3>
-
-              <p className="text-white/90 text-[12px] leading-5 max-w-[210px] mb-5">
-                Initiate a new Data entry. Add required details & additional documents.
-              </p>
-
-              <button
-                type="button"
-                onClick={handleEnterData}
-                className="mt-auto h-[36px] px-5 rounded-full border border-white bg-transparent text-white text-[12px] font-semibold hover:bg-white hover:text-black transition duration-300"
+          {/* Cards Grid */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 mb-6 w-full mx-auto">
+            {cardsData.map((card, idx) => (
+              <div
+                key={idx}
+                style={{ transitionDelay: `${idx * 100}ms` }}
+                className={`group bg-black rounded-[22px] px-3 py-4 sm:px-4 sm:py-5 min-h-[220px] sm:min-h-[240px] flex flex-col items-center text-center justify-between min-w-0 
+                  transform transition-all duration-600 ease-out 
+                  hover:-translate-y-2 hover:shadow-xl hover:scale-[1.02]
+                  ${isLoaded ? 'translate-y-0 opacity-100 scale-100' : 'translate-y-5 opacity-0 scale-95'}`}
               >
-                Get Started
-              </button>
-            </div>
+                <div className="flex flex-col items-center">
+                  <div className="w-[44px] h-[44px] sm:w-[52px] sm:h-[52px] rounded-full border border-white/20 group-hover:border-white/50 flex items-center justify-center mb-3 transition-transform duration-300 group-hover:scale-110">
+                    <img
+                      src={card.icon}
+                      alt={card.title}
+                      className="w-5 h-5 sm:w-6 sm:h-6 object-contain"
+                    />
+                  </div>
 
-            <div className="bg-black rounded-[22px] px-4 py-5 min-h-[230px] flex flex-col items-center text-center">
-              <div className="w-[56px] h-[56px] rounded-full border border-white/20 flex items-center justify-center mb-4">
-                <img
-                  src={checkData1Icon}
-                  alt="Validate Data"
-                  className="w-6 h-6 object-contain"
-                />
+                  <h3 className="text-white text-[16px] sm:text-[18px] font-bold mb-1 truncate w-full">
+                    {card.title}
+                  </h3>
+
+                  <p className="text-white/80 text-[11px] sm:text-[12px] leading-4 sm:leading-5 mb-3">
+                    {card.desc}
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={card.action}
+                  className="w-full sm:w-auto min-w-[100px] h-[34px] sm:h-[36px] px-3 sm:px-5 rounded-full border border-white bg-transparent text-white text-[11px] sm:text-[12px] font-semibold hover:bg-white hover:text-black transition duration-300 truncate active:scale-95"
+                >
+                  Get Started
+                </button>
               </div>
-
-              <h3 className="text-white text-[19px] font-bold mb-2">
-                Validate Data
-              </h3>
-
-              <p className="text-white/90 text-[12px] leading-5 max-w-[210px] mb-5">
-                Access your entered Data, add notes & upload documents if needed.
-              </p>
-
-              <button
-                type="button"
-                onClick={handleValidateData}
-                className="mt-auto h-[36px] px-5 rounded-full border border-white bg-transparent text-white text-[12px] font-semibold hover:bg-white hover:text-black transition duration-300"
-              >
-                Get Started
-              </button>
-            </div>
-             <div className="bg-black rounded-[22px] px-4 py-5 min-h-[230px] flex flex-col items-center text-center">
-              <div className="w-[56px] h-[56px] rounded-full border border-white/20 flex items-center justify-center mb-4">
-                <img
-                  src={fileDashboardIcon}
-                  alt="File Dashboard"
-                  className="w-6 h-6 object-contain"
-                
-                />
-              </div>
-
-              <h3 className="text-white text-[19px] font-bold mb-2">
-                File Dashboard
-              </h3>
-
-              <p className="text-white/90 text-[12px] leading-5 max-w-[210px] mb-5">
-                Uploaded files, view their status.
-              </p>
-
-              <button
-                type="button"
-                onClick={handleFileDashboard}
-                className="mt-auto h-[36px] px-5 rounded-full border border-white bg-transparent text-white text-[12px] font-semibold hover:bg-white hover:text-black transition duration-300"
-              >
-                Get Started
-              </button>
-            </div>
-
-
-            <div className="bg-black rounded-[22px] px-4 py-5 min-h-[230px] flex flex-col items-center text-center">
-              <div className="w-[56px] h-[56px] rounded-full border border-white/20 flex items-center justify-center mb-4">
-                <img
-                  src={checkData2Icon}
-                  alt="UL Pure"
-                  className="w-6 h-6 object-contain"
-                />
-              </div>
-
-              <h3 className="text-white text-[19px] font-bold mb-2">
-                UL Pure
-              </h3>
-
-              <p className="text-white/90 text-[12px] leading-5 max-w-[210px] mb-5">
-                Access validated data and reporting details.
-              </p>
-
-              <button
-                type="button"
-                onClick={handleUlPure}
-                className="mt-auto h-[36px] px-5 rounded-full border border-white bg-transparent text-white text-[12px] font-semibold hover:bg-white hover:text-black transition duration-300"
-              >
-                Get Started
-              </button>
-            </div>
+            ))}
           </div>
 
           <div className="flex justify-center pt-1 pb-1">

@@ -1,8 +1,7 @@
 import { useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import TopNavbar from '../components/topnavbar/TopNavbar';
-import { authFetch } from '../config/api';
-import { API_BASE_URL } from '../config/api';
+import { authFetch, API_BASE_URL, getToken } from '../config/api';
 
 function DashboardPage() {
   const navigate = useNavigate();
@@ -87,8 +86,8 @@ function DashboardPage() {
     setStatusFilter('');
   };
 
-  const handlePreview = (row) => {
-    const previewUrl = `${API_BASE_URL}/api/files/view?blobUrl=${encodeURIComponent(row.PdfFile)}`;
+    const handlePreview = (row) => {
+    const previewUrl = `${API_BASE_URL}/api/files/view?blobUrl=${encodeURIComponent(row.PdfFile)}&token=${getToken()}`;
     setPreviewFile({ ...row, previewUrl });
     setPreviewOpen(true);
   };

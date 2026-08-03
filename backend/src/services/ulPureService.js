@@ -1,6 +1,6 @@
 const db = require('../config/db');
 const { logFieldChanges } = require('./auditService');
-const { calculateAll, prevMonth } = require('./calculationService');
+const { calculateAll, prevMonth, FORMULA_DESCRIPTIONS } = require('./calculationService');
 
 // Aliased column list: returns UlpureData rows using the legacy UlPureEntries
 // field names so existing controllers / frontend keep working unchanged.
@@ -221,13 +221,14 @@ const moveModifiedValidatedEntriesToUlPure = ({
 
 // Get all UL Pure entries
 const fetchUlPureEntries = () => {
-  return db
-    .prepare(
-      `SELECT ${UL_COLUMNS} FROM UlpureData ORDER BY Id DESC`
-    )
-    .all();
+  const rows = db.prepare(`SELECT ${UL_COLUMNS} FROM UlpureData ORDER BY Id DESC`).all();
+  return rows.map((row) => ({
+    ...row,
+    FormulaDescription:
+      FORMULA_DESCRIPTIONS[row.FormulaCode] ||
+      (row.DataSource === 'Manual' ? 'Manual entry value, used as-is (no calculation)' : '-'),
+  }));
 };
-
 
 
 // Get one entry
@@ -269,10 +270,10 @@ const updateUlPureEntry = (id, data) => {
   db.prepare(`
     UPDATE UlpureData
     SET
-      PostingDateMonth = ?,
+      PostingMonth = ?,
       Consumption = ?,
-      Comments = ?,
-      UlpureStatus = ?,
+      Comment = ?,
+      Status = ?,
       ModifiedBy = ?,
       ModifiedAt = datetime('now')
     WHERE Id = ?

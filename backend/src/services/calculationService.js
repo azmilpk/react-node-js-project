@@ -133,6 +133,59 @@ const waterWithDischarge = (useCode) => ({ cur }) => {
 // Volvo reference figures.
 const NAT_GAS_CCF_TO_MWH = 0.0293071070172;
 const KITCHEN_PROPANE_TO_LB = 4.24;
+// Plain-English description of the math behind each formula code, shown to
+// end users in the UL Pure "Formula" column (INDICATOR_META covers the
+// resulting indicator metadata, not the calculation itself).
+const FORMULA_DESCRIPTIONS = {
+  // Köping
+  ELEC_STD: 'V1 (total electricity, MWh) + (V5 − V2 − V3 − V4) ÷ 1000 (E-hallen minus charging meters, kWh→MWh)',
+  DH_STD: '(V5 delta) + (V1+V2+V4 delta) + V13 (E-hallen); V3 delta reported separately as recovered energy',
+  RECOVERED_ENERGY: 'V3 (Kompressor) month-over-month delta',
+  WATER_NET: '(V1+V2+V3+V4 delta) − (V9+V10+V11+V12 delta) — main meters minus cooling',
+  WATER_COOL: '(V9+V11+V12) month-over-month delta — cooling-tower meters',
+  WATER_PROC: '(V15 × 0.9 + V16 + V17 × 0.9) × 1.25 — fresh-water and evaporation factors',
+  WATER_DOM: 'Total (cooling + net + V18) − water used in process − cooling of process',
+  WATER_DISCH: '(V15 × 0.9) + Domestic water use',
+  LPG_STD: 'V1 (kg) × 12900 ÷ 1,000,000 → MWh',
+  DIESEL_STD: 'V1 (litres), passed through unchanged',
+  PRODUCED_STD: 'V1, passed through unchanged',
+  CONSTANT_PROP_GAS_STD: 'V1, passed through unchanged',
+  // US sites (RT100, MEC, Macungie, LVLC)
+  ELEC_PASS: 'Sum of all electricity meter slots for the month (kWh)',
+  NATGAS_PASS: 'Sum of meter slots × 0.0293071070172 → MWh (therm→MWh)',
+  WATER_USE_GAL: 'Sum of water meter slots (US gallon); mirrored to Water discharge',
+  WATER_DOM_GAL: 'Sum of water meter slots (US gallon); mirrored to Water discharge',
+  WATER_DISCH_GAL: 'Same volume as the paired Water indicator (mirrored)',
+  PROPANE_HC_VOL_GAL: 'Sum of propane meter slots (US gallon)',
+  PROPANE_IT_VOL_GAL: 'Sum of propane meter slots (US gallon)',
+  FORKLIFT_PROPANE: 'Sum of meter slots (lb), passed through unchanged',
+  KITCHEN_PROPANE: 'Sum of meter slots × 4.24 → lb',
+  GASOLINE_IT: 'Sum of gasoline meter slots (US gallon)',
+  DIESEL_PROC_GAL: 'Sum of diesel meter slots, passed through unchanged',
+  DIESEL_PROC_L: 'Sum of diesel meter slots, passed through unchanged',
+  HVO_TRANSPORT: 'Sum of HVO diesel meter slots (US gallon)',
+  PRODUCED_TRUCKS: 'Sum of produced-unit meter slots',
+  // NRV (aggregate mode — SUM(Consumption) by TemplateType)
+  NRV_ELEC: 'SUM(Consumption) where TemplateType = Electricity (or Renewable Electricity, excluding Solar PV Array)',
+  NRV_RENEW_ELEC: 'SUM(Consumption) where TemplateType = Renewable Electricity and Account = Solar PV Array',
+  NRV_NATGAS: 'SUM(Consumption) where TemplateType = Natural Gas',
+  NRV_DIESEL: 'SUM(Consumption) where TemplateType = Diesel, excluding PowerBI accounts',
+  NRV_DIESEL_PT: "SUM(Consumption) where TemplateType = Diesel and Account contains 'powerbi'",
+  NRV_PETROL: 'SUM(Consumption) where TemplateType = Petrol',
+  NRV_PROPANE: 'SUM(Consumption) where TemplateType = Propane or ARC3',
+  NRV_PRODUCED: 'SUM(Consumption) where TemplateType = Produced Units',
+  NRV_WATER: 'SUM(Consumption) where TemplateType = Water',
+  NRV_WT_TREATED: 'SUM(Consumption) where TemplateType = WT_Treated',
+  NRV_WT_RUO: 'SUM(Consumption) where TemplateType = WT_RUO',
+  NRV_WT_TREATEDFAC: 'SUM(Consumption) where TemplateType = WT_TreatedFacility',
+  NRV_WT_WS: 'SUM(Consumption) where TemplateType = WT_WS',
+  NRV_WT_WTP: "Fixed constant value: 'Yes'",
+  NRV_RENEW_COV: 'Fixed constant value: 100%',
+  NRV_DIESEL_RENEW: 'Fixed constant value: 0%',
+  NRV_DIESEL_SULPHUR: 'Fixed constant value: 0 ppm',
+  // Manual entries
+  DIRECT: 'Manual entry value, used as-is (no calculation)',
+};
 
 // Official ESG indicator metadata, keyed by the formula code each output uses.
 // This drives the Indicator Name / Indicator Id / Units shown in UL Pure so the
@@ -676,4 +729,4 @@ function calculateAll({ site } = {}) {
   return results;
 }
 
-module.exports = { calculateAll, prevMonth };
+module.exports = { calculateAll, prevMonth, FORMULA_DESCRIPTIONS };

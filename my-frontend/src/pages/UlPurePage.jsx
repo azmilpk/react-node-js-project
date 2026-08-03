@@ -8,6 +8,16 @@ import { regionFullName } from '../config/regionNames';
 import { saveCache, loadCache, clearCache } from '../utils/pageCache';
 
 const CACHE_KEY = 'ulPurePage_cache';
+
+const DATA_SOURCE_EXPLANATIONS = {
+  Calculated: 'Generated automatically by the calculation engine from the raw meter readings (Value Slots) for the month.',
+  Manual: 'Entered directly by a user on the Validate/Add Data form and used as-is — no meter calculation applied.',
+};
+
+const VALUE_SLOT_EXPLANATION =
+  "A 'Value Slot' (V1, V2, V3, …) is one raw meter/account reading imported for the site and month. " +
+  'A utility can have several meters in the same month (e.g. two water meters), each landing in its own slot — ' +
+  'the formula below shows exactly how those slots are combined to produce this indicator.';
 function UlPurePage() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -22,6 +32,7 @@ function UlPurePage() {
   const [monthFilter, setMonthFilter] = useState('');
   const [yearFilter, setYearFilter] = useState('');
   const [historyRow, setHistoryRow] = useState(null);
+  const [formulaRow, setFormulaRow] = useState(null);
 
   useEffect(() => {
   const cached = loadCache(CACHE_KEY);
@@ -99,6 +110,8 @@ useEffect(() => {
           fileName: item.FileName || item.fileName || 'No file uploaded',
           fileUrl: item.FileUrl || item.fileUrl || '',
           comment: item.Comment || item.comment || '',
+          formula: item.FormulaDescription || item.formulaDescription || '-',
+          dataSource: item.DataSource || item.dataSource || '-',
         };
       });
 
@@ -306,13 +319,14 @@ useEffect(() => {
                     <th className="px-4 py-3 text-left text-[13px] font-semibold">Report Date</th>
                     <th className="px-4 py-3 text-left text-[13px] font-semibold">Validate</th>
                     <th className="px-4 py-3 text-left text-[13px] font-semibold">History</th>
+                    <th className="px-4 py-3 text-left text-[13px] font-semibold">Formula</th>
                   </tr>
                 </thead>
 
                 <tbody>
                   {loading ? (
                     <tr>
-                      <td colSpan="9" className="px-4 py-8 text-center text-[13px] text-black/60">
+                      <td colSpan="11" className="px-4 py-8 text-center text-[13px] text-black/60">
                         Loading...
                       </td>
                     </tr>
@@ -351,11 +365,20 @@ useEffect(() => {
                             History
                           </button>
                         </td>
+                        <td className="px-4 py-4">
+                          <button
+                            type="button"
+                            onClick={() => setFormulaRow(row)}
+                            className="h-[34px] px-4 rounded-full border border-black/20 text-black text-[12px] font-semibold hover:bg-black hover:text-white transition duration-300"
+                          >
+                            Formula
+                          </button>
+                        </td>
                       </tr>
                     ))
                   ) : (
                     <tr>
-                      <td colSpan="9" className="px-4 py-8 text-center text-[13px] text-black/60">
+                      <td colSpan="11" className="px-4 py-8 text-center text-[13px] text-black/60">
                         No validated data available.
                       </td>
                     </tr>
@@ -401,6 +424,44 @@ useEffect(() => {
             </div>
             <div className="p-5">
               <HistoryPanel tableName="UlPureEntries" recordId={historyRow.id} />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {formulaRow && (
+        <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4">
+          <div className="w-full max-w-2xl bg-white rounded-[20px] shadow-xl overflow-hidden">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-black/10">
+              <div>
+                <h2 className="text-[18px] font-bold text-black">Formula Used</h2>
+                <p className="text-[13px] text-black/60">
+                  {formulaRow.utility} — {formulaRow.entry || formulaRow.site}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setFormulaRow(null)}
+                className="min-w-[100px] h-[38px] px-4 rounded-full bg-black text-white text-[12px] font-semibold hover:bg-neutral-800 transition duration-300"
+              >
+                Close
+              </button>
+            </div>
+                        <div className="p-5 space-y-4">
+              <div>
+                <h3 className="text-[13px] font-semibold text-black mb-1">Data Source: {formulaRow.dataSource}</h3>
+                <p className="text-[13px] text-black/70 leading-relaxed">
+                  {DATA_SOURCE_EXPLANATIONS[formulaRow.dataSource] || 'Source of this value is not recorded.'}
+                </p>
+              </div>
+              <div>
+                <h3 className="text-[13px] font-semibold text-black mb-1">Value Slots</h3>
+                <p className="text-[13px] text-black/70 leading-relaxed">{VALUE_SLOT_EXPLANATION}</p>
+              </div>
+              <div>
+                <h3 className="text-[13px] font-semibold text-black mb-1">Formula</h3>
+                <p className="text-[14px] text-black leading-relaxed">{formulaRow.formula}</p>
+              </div>
             </div>
           </div>
         </div>
