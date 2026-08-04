@@ -33,6 +33,7 @@ function UlPurePage() {
   const [yearFilter, setYearFilter] = useState('');
   const [historyRow, setHistoryRow] = useState(null);
   const [formulaRow, setFormulaRow] = useState(null);
+  const [formulaSources, setFormulaSources] = useState(null);
 
   useEffect(() => {
   const cached = loadCache(CACHE_KEY);
@@ -56,6 +57,22 @@ useEffect(() => {
     });
   }
 }, [tableData, utilityFilter, monthFilter, yearFilter]);
+
+useEffect(() => {
+  if (!formulaRow) {
+    setFormulaSources(null);
+    return;
+  }
+  (async () => {
+    try {
+      const response = await authFetch(`${API_BASE_URL}/api/ul-pure-entries/${formulaRow.id}/raw-data`);
+      const result = await response.json();
+      if (response.ok) setFormulaSources(result);
+    } catch (error) {
+      console.error('Formula sources fetch error:', error.message);
+    }
+  })();
+}, [formulaRow]);
   const fetchUlPureEntries = async () => {
     try {
       setLoading(true);
@@ -457,6 +474,42 @@ useEffect(() => {
               <div>
                 <h3 className="text-[13px] font-semibold text-black mb-1">Value Slots</h3>
                 <p className="text-[13px] text-black/70 leading-relaxed">{VALUE_SLOT_EXPLANATION}</p>
+                {formulaSources && (
+                  <div className="mt-3 space-y-2">
+                    {[...formulaSources.currentMonth.rows, ...formulaSources.previousMonth.rows].length === 0 ? (
+                      <p className="text-[12px] text-black/50">No raw meter rows recorded for this entry.</p>
+                    ) : (
+                      <>
+                        {formulaSources.currentMonth.rows.length > 0 && (
+                          <div>
+                            <p className="text-[11px] font-semibold text-black/50 mb-1">
+                              {formulaSources.currentMonth.month}
+                            </p>
+                            {formulaSources.currentMonth.rows.map((r) => (
+                              <p key={`cur-${r.Id}`} className="text-[12px] text-black/70">
+                                {r.ValueSlot}: {r.AccountNumber || 'Unnamed meter'} = {r.Consumption} {r.Units || ''}
+                                {' '}— <span className="font-semibold">Source: {r.DataSource || 'Unknown'}</span>
+                              </p>
+                            ))}
+                          </div>
+                        )}
+                        {formulaSources.previousMonth.rows.length > 0 && (
+                          <div>
+                            <p className="text-[11px] font-semibold text-black/50 mb-1">
+                              {formulaSources.previousMonth.month} (previous month, used for delta)
+                            </p>
+                            {formulaSources.previousMonth.rows.map((r) => (
+                              <p key={`prev-${r.Id}`} className="text-[12px] text-black/70">
+                                {r.ValueSlot}: {r.AccountNumber || 'Unnamed meter'} = {r.Consumption} {r.Units || ''}
+                                {' '}— <span className="font-semibold">Source: {r.DataSource || 'Unknown'}</span>
+                              </p>
+                            ))}
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </div>
+                )}
               </div>
               <div>
                 <h3 className="text-[13px] font-semibold text-black mb-1">Formula</h3>

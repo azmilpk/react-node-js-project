@@ -246,22 +246,6 @@ function DashboardPage() {
               </div>
 
               <div>
-                <label className="block text-[13px] font-semibold text-black mb-2">
-                  Bot Status
-                </label>
-                <select
-                  value={statusFilter}
-                  onChange={(e) => setStatusFilter(e.target.value)}
-                  className="w-full h-[42px] rounded-[12px] border border-black/20 px-3 bg-white text-[13px] outline-none"
-                >
-                  <option value="">All</option>
-                  <option value="success">Success</option>
-                  <option value="manual">Manual</option>
-                  
-                </select>
-              </div>
-
-              <div>
                 <button
                   type="button"
                   onClick={handleReset}
@@ -282,11 +266,7 @@ function DashboardPage() {
                   <tr className="bg-black text-white">
                     <th className="px-4 py-3 text-left text-[13px] font-semibold">Site</th>
                     <th className="px-4 py-3 text-left text-[13px] font-semibold">Utility</th>
-                    <th className="px-4 py-3 text-left text-[13px] font-semibold">Account No</th>
-                    <th className="px-4 py-3 text-left text-[13px] font-semibold">Consumption</th>
-                    <th className="px-4 py-3 text-left text-[13px] font-semibold">Posting Month</th>
                     <th className="px-4 py-3 text-left text-[13px] font-semibold">Data Source</th>
-                    <th className="px-4 py-3 text-left text-[13px] font-semibold">Bot Status</th>
                     <th className="px-4 py-3 text-left text-[13px] font-semibold">Invoice File</th>
                   </tr>
                 </thead>
@@ -294,7 +274,7 @@ function DashboardPage() {
                 <tbody>
                   {loading ? (
                     <tr>
-                      <td colSpan="9" className="px-4 py-8 text-center text-[13px] text-black/50">
+                      <td colSpan="4" className="px-4 py-8 text-center text-[13px] text-black/50">
                         Loading...
                       </td>
                     </tr>
@@ -308,28 +288,7 @@ function DashboardPage() {
                           {row.UtilityName || '-'}
                         </td>
                         <td className="px-4 py-4 text-[13px] text-black">
-                          {row.AccountNumber || '-'}
-                        </td>
-                        <td className="px-4 py-4 text-[13px] text-black">
-                          {row.Consumption ?? '-'}
-                        </td>
-                       
-                        <td className="px-4 py-4 text-[13px] text-black">
-                          {row.PostingDateMonth || '-'}
-                        </td>
-                        <td className="px-4 py-4 text-[13px] text-black">
                           {row.DataSource || '-'}
-                        </td>
-                        <td className="px-4 py-4">
-                          <span className={`inline-flex items-center px-3 py-1 rounded-full text-[12px] font-semibold ${
-                            row.BotStatus === 'success'
-                              ? 'bg-green-100 text-green-700'
-                              : row.BotStatus === 'failed'
-                              ? 'bg-red-100 text-red-700'
-                              : 'bg-yellow-100 text-yellow-700'
-                          }`}>
-                            {row.BotStatus || 'pending'}
-                          </span>
                         </td>
                         <td className="px-4 py-4">
                           {row.hasFile ? (
@@ -352,7 +311,7 @@ function DashboardPage() {
                     ))
                   ) : (
                     <tr>
-                      <td colSpan="9" className="px-4 py-8 text-center text-[13px] text-black/50">
+                      <td colSpan="4" className="px-4 py-8 text-center text-[13px] text-black/50">
                         No records found.
                       </td>
                     </tr>

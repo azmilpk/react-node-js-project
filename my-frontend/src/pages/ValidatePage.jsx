@@ -22,7 +22,7 @@ function ValidatePage() {
 
   const [tableData, setTableData] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [utilityFilter, setUtilityFilter] = useState([]);
+  const [utilityFilter, setUtilityFilter] = useState('');
   const [monthFilter, setMonthFilter] = useState('');
   const [yearFilter, setYearFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('Pending');
@@ -44,7 +44,7 @@ useEffect(() => {
   if (cached) {
     // Restore everything from cache
     setTableData(cached.data);
-    setUtilityFilter(cached.filters.utilityFilter || []);
+    setUtilityFilter(cached.filters.utilityFilter || '');
     setMonthFilter(cached.filters.monthFilter || '');
     setYearFilter(cached.filters.yearFilter || '');
     setStatusFilter(cached.filters.statusFilter || 'Pending');
@@ -130,7 +130,7 @@ useEffect(() => {
       const matchSite =
         !selectedSite || rowSite === normalizedSelectedSite;
 
-            const matchUtility = utilityFilter.length === 0 || utilityFilter.includes(row.utility);
+            const matchUtility = !utilityFilter || row.utility === utilityFilter;
       const matchMonth = !monthFilter || month === monthFilter;
       const matchYear = !yearFilter || year === yearFilter;
       const matchStatus = !statusFilter || row.status === statusFilter;
@@ -160,7 +160,7 @@ useEffect(() => {
   };
 
   const handleReset = () => {
-    setUtilityFilter([]);
+    setUtilityFilter('');
     setMonthFilter('');
     setYearFilter('');
     setStatusFilter('Pending');

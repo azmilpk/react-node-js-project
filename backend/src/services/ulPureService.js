@@ -320,7 +320,7 @@ const clearUlPureEntries = () => {
 
 const RAW_COLUMNS = `
   Id, ValueSlot, Consumption, PostingDateMonth, Units,
-  AccountNumber, InvoiceNo, PdfFile, ValidateUser, Status, Comments, CreatedAt
+  AccountNumber, DataSource, InvoiceNo, PdfFile, ValidateUser, Status, Comments, CreatedAt
 `;
 
 // Raw GtoInvoices rows that fed a specific Calculated UlpureData entry —
