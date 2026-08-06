@@ -12,12 +12,13 @@ function prevMonth(ym) {
 const num = (v) => (typeof v === 'number' && !Number.isNaN(v) ? v : 0);
 
 // Build { V1: number, V2: number, ... } for one site/utility/month
-function slotMap(siteId, utilityTypeId, month) {
-  const rows = db.prepare(`
-    SELECT ValueSlot, Consumption
+async function slotMap(t, siteId, utilityTypeId, month) {
+  const rows = await t.all(
+    `SELECT ValueSlot, Consumption
     FROM GtoInvoices
-    WHERE SiteId = ? AND UtilityTypeId = ? AND PostingDateMonth = ?
-  `).all(siteId, utilityTypeId, month);
+    WHERE SiteId = ? AND UtilityTypeId = ? AND PostingDateMonth = ?`,
+    [siteId, utilityTypeId, month]
+  );
   const map = {};
   for (const r of rows) map[r.ValueSlot] = r.Consumption ?? 0;
   return map;
@@ -165,24 +166,24 @@ const FORMULA_DESCRIPTIONS = {
   DIESEL_PROC_L: 'Sum of diesel meter slots, passed through unchanged',
   HVO_TRANSPORT: 'Sum of HVO diesel meter slots (US gallon)',
   PRODUCED_TRUCKS: 'Sum of produced-unit meter slots',
-  // NRV (aggregate mode — SUM(Consumption) by TemplateType)
-  NRV_ELEC: 'SUM(Consumption) where TemplateType = Electricity (or Renewable Electricity, excluding Solar PV Array)',
-  NRV_RENEW_ELEC: 'SUM(Consumption) where TemplateType = Renewable Electricity and Account = Solar PV Array',
-  NRV_NATGAS: 'SUM(Consumption) where TemplateType = Natural Gas',
-  NRV_DIESEL: 'SUM(Consumption) where TemplateType = Diesel, excluding PowerBI accounts',
-  NRV_DIESEL_PT: "SUM(Consumption) where TemplateType = Diesel and Account contains 'powerbi'",
-  NRV_PETROL: 'SUM(Consumption) where TemplateType = Petrol',
-  NRV_PROPANE: 'SUM(Consumption) where TemplateType = Propane or ARC3',
-  NRV_PRODUCED: 'SUM(Consumption) where TemplateType = Produced Units',
-  NRV_WATER: 'SUM(Consumption) where TemplateType = Water',
-  NRV_WT_TREATED: 'SUM(Consumption) where TemplateType = WT_Treated',
-  NRV_WT_RUO: 'SUM(Consumption) where TemplateType = WT_RUO',
-  NRV_WT_TREATEDFAC: 'SUM(Consumption) where TemplateType = WT_TreatedFacility',
-  NRV_WT_WS: 'SUM(Consumption) where TemplateType = WT_WS',
-  NRV_WT_WTP: "Fixed constant value: 'Yes'",
-  NRV_RENEW_COV: 'Fixed constant value: 100%',
-  NRV_DIESEL_RENEW: 'Fixed constant value: 0%',
-  NRV_DIESEL_SULPHUR: 'Fixed constant value: 0 ppm',
+  // NRV (aggregate mode — adds up every raw invoice row tagged with a matching type)
+  NRV_ELEC: 'Adds up every invoice row tagged "Electricity" for the month, plus any "Renewable Electricity" rows that are not the Solar PV Array meter.',
+  NRV_RENEW_ELEC: 'Adds up every invoice row tagged "Renewable Electricity" whose meter/account is the Solar PV Array.',
+  NRV_NATGAS: 'Adds up every invoice row tagged "Natural Gas" for the month.',
+  NRV_DIESEL: 'Adds up every invoice row tagged "Diesel" for the month, except rows imported from PowerBI (those are counted separately as "Product Testing" below, so nothing is double-counted).',
+  NRV_DIESEL_PT: 'Adds up the "Diesel" invoice rows that were imported from PowerBI (identified by "powerbi" in the account name) — reported separately as Product Testing.',
+  NRV_PETROL: 'Adds up every invoice row tagged "Petrol" for the month.',
+  NRV_PROPANE: 'Adds up every invoice row tagged "Propane" or "ARC3" for the month.',
+  NRV_PRODUCED: 'Adds up every invoice row tagged "Produced Units" for the month.',
+  NRV_WATER: 'Adds up every invoice row tagged "Water" for the month.',
+  NRV_WT_TREATED: 'Adds up every invoice row tagged "WT_Treated" (water treated) for the month.',
+  NRV_WT_RUO: 'Adds up every invoice row tagged "WT_RUO" (water recycled/reused) for the month.',
+  NRV_WT_TREATEDFAC: 'Adds up every invoice row tagged "WT_TreatedFacility" (water sent to a treatment facility) for the month.',
+  NRV_WT_WS: 'Adds up every invoice row tagged "WT_WS" (water stored) for the month.',
+  NRV_WT_WTP: "Fixed answer, not calculated: 'Yes' (NRV has an on-site water treatment plant).",
+  NRV_RENEW_COV: 'Fixed answer, not calculated: 100% renewable coverage.',
+  NRV_DIESEL_RENEW: 'Fixed answer, not calculated: 0% renewable diesel.',
+  NRV_DIESEL_SULPHUR: 'Fixed answer, not calculated: 0 ppm sulphur content.',
   // Manual entries
   DIRECT: 'Manual entry value, used as-is (no calculation)',
 };
@@ -361,70 +362,75 @@ const SITE_CONFIG = {
 
 // Manual form entries land as DIRECT rows: a single, already-final value that
 // is echoed straight through instead of being run through a meter formula.
-const directStmt = db.prepare(`
-  SELECT SourceEntryId, Consumption, Units FROM GtoInvoices
+const DIRECT_SQL = `
+  SELECT TOP 1 SourceEntryId, Consumption, Units FROM GtoInvoices
   WHERE SiteId = ? AND UtilityTypeId = ? AND PostingDateMonth = ? AND FormulaCode = 'DIRECT'
-  ORDER BY Id DESC LIMIT 1
-`);
+  ORDER BY Id DESC
+`;
 
 // A form entry promoted via the "Generate UL Pure" button already exists in
 // UlpureData as a Manual row; the calc engine must not create a duplicate.
-const manualExistsStmt = db.prepare(`
-  SELECT 1 FROM UlpureData
-  WHERE SourceEntryId = ? AND DataSource = 'Manual' LIMIT 1
-`);
+const MANUAL_EXISTS_SQL = `
+  SELECT TOP 1 1 AS ok FROM UlpureData
+  WHERE SourceEntryId = ? AND DataSource = 'Manual'
+`;
 
-function calculateAll({ site } = {}) {
+// Upsert on the natural key (site + utility + month + formula) so a recalculated
+// row keeps its Id — and therefore its audit history — instead of being deleted
+// and re-inserted with a fresh Id every run.
+const FIND_CALC_SQL = `
+  SELECT TOP 1 Id, Consumption, ReviewStatus, UlpureStatus FROM UlpureData
+  WHERE SiteId = ? AND UtilityTypeId = ? AND PostingDateMonth = ? AND DataSource = 'Calculated' AND FormulaCode = ?
+`;
+
+const INSERT_CALC_SQL = `
+  INSERT INTO UlpureData
+    (PostingDateMonth, UtilityTypeId, SiteId, Utility, Site,
+     Consumption, PreviousConsumptionUL, Units, UlpureStatus, FormulaCode, IndicatorName, IndicatorId, DataSource)
+  VALUES (@month, @utilityTypeId, @siteId, @utility, @site,
+          @value, @previous, @units, 'Validate', @code, @indicator, @indicatorId, 'Calculated')
+`;
+
+const UPDATE_CALC_SQL = `
+  UPDATE UlpureData
+  SET Utility = @utility, Site = @site, Consumption = @value,
+      Units = @units, FormulaCode = @code, IndicatorName = @indicator, IndicatorId = @indicatorId
+  WHERE Id = @id
+`;
+
+const AGG_FIND_SQL = `
+  SELECT TOP 1 Id, Consumption, ReviewStatus, UlpureStatus FROM UlpureData
+  WHERE SiteId = ? AND Utility = ? AND PostingDateMonth = ? AND DataSource = 'Calculated'
+`;
+
+async function calculateAll({ site } = {}) {
   // When a site is given, resolve its id and scope everything (combos, the
   // special passes, and the prune) to that site so other sites' Calculated
   // rows are never recomputed or deleted. No site = process every site.
   const siteRow = site
-    ? db.prepare('SELECT Id FROM Sites WHERE SiteName = ?').get(site)
+    ? await db.get('SELECT Id FROM Sites WHERE SiteName = ?', [site])
     : null;
   const siteId = siteRow ? siteRow.Id : null;
   if (site && !siteId) return []; // unknown site -> nothing to do
 
-  const combos = db.prepare(`
-    SELECT DISTINCT g.SiteId, g.UtilityTypeId, g.PostingDateMonth,
+  const combos = await db.all(
+    `SELECT DISTINCT g.SiteId, g.UtilityTypeId, g.PostingDateMonth,
            s.SiteName, u.UtilityName
     FROM GtoInvoices g
     JOIN Sites s ON s.Id = g.SiteId
     JOIN UtilityTypes u ON u.Id = g.UtilityTypeId
     WHERE g.PostingDateMonth IS NOT NULL
       ${siteId ? 'AND g.SiteId = ?' : ''}
-    ORDER BY g.PostingDateMonth, s.SiteName, u.UtilityName
-  `).all(...(siteId ? [siteId] : []));
-
-  // Upsert on the natural key (site + utility + month) so a recalculated row
-  // keeps its Id — and therefore its audit history — instead of being deleted
-  // and re-inserted with a fresh Id every run.
- const findCalcRow = db.prepare(`
-  SELECT Id, Consumption, ReviewStatus, UlpureStatus FROM UlpureData
-  WHERE SiteId = ? AND UtilityTypeId = ? AND PostingDateMonth = ? AND DataSource = 'Calculated' AND FormulaCode = ?
-  LIMIT 1
-`);
-
-  const insertCalc = db.prepare(`
-    INSERT INTO UlpureData
-      (PostingDateMonth, UtilityTypeId, SiteId, Utility, Site,
-       Consumption, PreviousConsumptionUL, Units, UlpureStatus, FormulaCode, IndicatorName, IndicatorId, DataSource)
-    VALUES (@month, @utilityTypeId, @siteId, @utility, @site,
-            @value, @previous, @units, 'Validate', @code, @indicator, @indicatorId, 'Calculated')
-  `);
-
-  const updateCalc = db.prepare(`
-    UPDATE UlpureData
-    SET Utility = @utility, Site = @site, Consumption = @value,
-        Units = @units, FormulaCode = @code, IndicatorName = @indicator, IndicatorId = @indicatorId
-    WHERE Id = @id
-  `);
+    ORDER BY g.PostingDateMonth, s.SiteName, u.UtilityName`,
+    siteId ? [siteId] : []
+  );
 
   const results = [];
   // Utility-type id lookup by name, used by the guaranteed-row pass below.
-  const utilityTypeByName = new Map(
-    db.prepare('SELECT Id, UtilityName FROM UtilityTypes').all().map((r) => [r.UtilityName, r])
-  );
-  db.transaction(() => {
+  const utilityTypeRows = await db.all('SELECT UtilityTypeID AS Id, UtilityName FROM UtilityTypes');
+  const utilityTypeByName = new Map(utilityTypeRows.map((r) => [r.UtilityName, r]));
+
+  await db.transaction(async (t) => {
     const keptIds = [];
     // Track which site+month combos produced output so we can guarantee a
     // Diesel line (actual value or 0) for each of them below.
@@ -438,8 +444,8 @@ function calculateAll({ site } = {}) {
       // emitted after this loop, so skip them here.
       if (cfg.guaranteedRows && cfg.guaranteedRows.some((g) => g.utility === c.UtilityName)) continue;
 
-      const cur = slotMap(c.SiteId, c.UtilityTypeId, c.PostingDateMonth);
-      const prev = slotMap(c.SiteId, c.UtilityTypeId, prevMonth(c.PostingDateMonth));
+      const cur = await slotMap(t, c.SiteId, c.UtilityTypeId, c.PostingDateMonth);
+      const prev = await slotMap(t, c.SiteId, c.UtilityTypeId, prevMonth(c.PostingDateMonth));
       // Delta utilities need a previous month baseline to be meaningful.
       const isDelta = cfg.deltaUtilities && cfg.deltaUtilities.includes(c.UtilityName);
 
@@ -452,7 +458,9 @@ function calculateAll({ site } = {}) {
       // indicator always applies regardless of how the data arrived. Anything
       // not overridden falls back to the generic FORMULAS (Köping's defaults).
       const siteFn = cfg.formulas && cfg.formulas[c.UtilityName];
-      const direct = siteFn ? null : directStmt.get(c.SiteId, c.UtilityTypeId, c.PostingDateMonth);
+      const direct = siteFn
+        ? null
+        : await t.get(DIRECT_SQL, [c.SiteId, c.UtilityTypeId, c.PostingDateMonth]);
       if (siteFn) {
         if (isDelta && Object.keys(prev).length === 0) {
           results.push({ ...c, skipped: true, reason: 'no baseline month' });
@@ -464,7 +472,7 @@ function calculateAll({ site } = {}) {
         // Manual / form-entry rows are already final values -> pass straight through.
         // Skip if this form entry was already promoted via "Generate UL Pure"
         // (a Manual row exists) so we don't create a duplicate Calculated row.
-        if (direct.SourceEntryId && manualExistsStmt.get(direct.SourceEntryId)) {
+        if (direct.SourceEntryId && (await t.get(MANUAL_EXISTS_SQL, [direct.SourceEntryId]))) {
           results.push({ ...c, skipped: true, reason: 'already generated (manual row exists)' });
           continue;
         }
@@ -505,7 +513,7 @@ function calculateAll({ site } = {}) {
         const indicatorId = meta.id || null;
         const units = meta.units || o.units;
 
-         const existing = findCalcRow.get(c.SiteId, c.UtilityTypeId, c.PostingDateMonth, o.code);
+        const existing = await t.get(FIND_CALC_SQL, [c.SiteId, c.UtilityTypeId, c.PostingDateMonth, o.code]);
         if (existing) {
           // Never overwrite a value that's already been validated/reviewed for this month.
           if (existing.ReviewStatus === 'Reviewed' || existing.UlpureStatus === 'Validated') {
@@ -515,16 +523,16 @@ function calculateAll({ site } = {}) {
           }
           // Record recalculated changes so they surface in the History panel.
           if (Number(existing.Consumption) !== value) {
-            logChange({
+            await logChange({
               tableName: 'UlpureData',
               recordId: existing.Id,
               fieldName: 'Consumption',
               oldValue: existing.Consumption,
               newValue: value,
               changedBy: 'System (recalc)',
-            });
+            }, t);
           }
-          updateCalc.run({
+          await t.run(UPDATE_CALC_SQL, {
             id: existing.Id,
             utility: o.utility || c.UtilityName,
             site: c.SiteName,
@@ -536,7 +544,7 @@ function calculateAll({ site } = {}) {
           });
           keptIds.push(existing.Id);
         } else {
-          const res = insertCalc.run({
+          const res = await t.run(INSERT_CALC_SQL, {
             month: c.PostingDateMonth,
             utilityTypeId: c.UtilityTypeId,
             siteId: c.SiteId,
@@ -582,11 +590,11 @@ function calculateAll({ site } = {}) {
         for (const [key, sName] of targets) {
           const [siteIdStr, month] = key.split('|');
           const gSiteId = Number(siteIdStr);
-          const slots = slotMap(gSiteId, ut.Id, month);
+          const slots = await slotMap(t, gSiteId, ut.Id, month);
           const factor = g.round != null ? 10 ** g.round : null;
           const raw = num(slots[g.slot]);
           const value = factor ? Math.round(raw * factor) / factor : raw;
-                    const existing = findCalcRow.get(gSiteId, ut.Id, month, g.code);
+          const existing = await t.get(FIND_CALC_SQL, [gSiteId, ut.Id, month, g.code]);
           if (existing) {
             // Never overwrite a value that's already been validated/reviewed for this month.
             if (existing.ReviewStatus === 'Reviewed' || existing.UlpureStatus === 'Validated') {
@@ -595,22 +603,22 @@ function calculateAll({ site } = {}) {
               continue;
             }
             if (Number(existing.Consumption) !== value) {
-              logChange({
+              await logChange({
                 tableName: 'UlpureData',
                 recordId: existing.Id,
                 fieldName: 'Consumption',
                 oldValue: existing.Consumption,
                 newValue: value,
                 changedBy: 'System (recalc)',
-              });
+              }, t);
             }
-            updateCalc.run({
+            await t.run(UPDATE_CALC_SQL, {
               id: existing.Id, utility: g.utility, site: sName, value,
               units: meta.units, code: g.code, indicator: meta.name, indicatorId: meta.id,
             });
             keptIds.push(existing.Id);
           } else {
-            const r = insertCalc.run({
+            const r = await t.run(INSERT_CALC_SQL, {
               month, utilityTypeId: ut.Id, siteId: gSiteId, utility: g.utility, site: sName,
               value, previous: null, units: meta.units, code: g.code, indicator: meta.name, indicatorId: meta.id,
             });
@@ -629,32 +637,18 @@ function calculateAll({ site } = {}) {
     for (const [siteName, siteCfg] of Object.entries(SITE_CONFIG)) {
       if (siteCfg.mode !== 'aggregate') continue;
       if (site && site !== siteName) continue; // respect the scoped run
-      const aggSite = db.prepare('SELECT Id FROM Sites WHERE SiteName = ?').get(siteName);
+      const aggSite = await t.get('SELECT Id FROM Sites WHERE SiteName = ?', [siteName]);
       if (!aggSite) continue;
 
-      const aggMonths = db
-        .prepare("SELECT DISTINCT PostingDateMonth AS m FROM GtoInvoices WHERE SiteId = ? AND PostingDateMonth IS NOT NULL")
-        .all(aggSite.Id)
-        .map((r) => r.m);
+      const aggMonths = (
+        await t.all(
+          "SELECT DISTINCT PostingDateMonth AS m FROM GtoInvoices WHERE SiteId = ? AND PostingDateMonth IS NOT NULL",
+          [aggSite.Id]
+        )
+      ).map((r) => r.m);
 
-      const aggFind = db.prepare(`
-        SELECT Id, Consumption, ReviewStatus, UlpureStatus FROM UlpureData
-        WHERE SiteId = ? AND Utility = ? AND PostingDateMonth = ? AND DataSource = 'Calculated'
-        LIMIT 1
-      `);
-
-      // Hitl has been retired: every source row for the month is summed.
-      const sumStmts = (siteCfg.sumUtilities || []).map((s) => ({
-        s,
-        stmt: db.prepare(`
-          SELECT COALESCE(SUM(CAST(Consumption AS REAL)), 0) AS total
-          FROM GtoInvoices
-          WHERE SiteId = @siteId AND PostingDateMonth = @month AND (${s.where})
-        `),
-      }));
-
-      const upsertAgg = (month, utility, code, value, units, id, name) => {
-        const existing = aggFind.get(aggSite.Id, utility, month);
+      const upsertAgg = async (month, utility, code, value, units, id, name) => {
+        const existing = await t.get(AGG_FIND_SQL, [aggSite.Id, utility, month]);
         if (existing) {
           // Overwrite guard: never clobber a value an auditor has reviewed or
           // edited/validated. Keep the row (so the prune step spares it) and skip.
@@ -664,19 +658,19 @@ function calculateAll({ site } = {}) {
             return;
           }
           if (String(existing.Consumption) !== String(value)) {
-            logChange({
+            await logChange({
               tableName: 'UlpureData',
               recordId: existing.Id,
               fieldName: 'Consumption',
               oldValue: existing.Consumption,
               newValue: value,
               changedBy: 'System (recalc)',
-            });
+            }, t);
           }
-          updateCalc.run({ id: existing.Id, utility, site: siteName, value, units, code, indicator: name, indicatorId: id });
+          await t.run(UPDATE_CALC_SQL, { id: existing.Id, utility, site: siteName, value, units, code, indicator: name, indicatorId: id });
           keptIds.push(existing.Id);
         } else {
-          const r = insertCalc.run({
+          const r = await t.run(INSERT_CALC_SQL, {
             month, utilityTypeId: null, siteId: aggSite.Id, utility, site: siteName,
             value, previous: null, units, code, indicator: name, indicatorId: id,
           });
@@ -686,16 +680,23 @@ function calculateAll({ site } = {}) {
       };
 
       for (const month of aggMonths) {
-        for (const { s, stmt } of sumStmts) {
-          let value = stmt.get({ siteId: aggSite.Id, month }).total || 0;
+        for (const s of (siteCfg.sumUtilities || [])) {
+          // Hitl has been retired: every source row for the month is summed.
+          const row = await t.get(
+            `SELECT COALESCE(SUM(CAST(Consumption AS FLOAT)), 0) AS total
+             FROM GtoInvoices
+             WHERE SiteId = @siteId AND PostingDateMonth = @month AND (${s.where})`,
+            { siteId: aggSite.Id, month }
+          );
+          let value = (row && row.total) || 0;
           if (s.round != null) {
             const f = 10 ** s.round;
             value = Math.round(value * f) / f;
           }
-          upsertAgg(month, s.utility, s.code, value, s.units, s.id, s.name);
+          await upsertAgg(month, s.utility, s.code, value, s.units, s.id, s.name);
         }
         for (const k of (siteCfg.constants || [])) {
-          upsertAgg(month, k.utility, k.code, k.value, k.units, k.id, k.name);
+          await upsertAgg(month, k.utility, k.code, k.value, k.units, k.id, k.name);
         }
       }
     }
@@ -706,27 +707,29 @@ function calculateAll({ site } = {}) {
     const siteClause = siteId ? ' AND SiteId = ?' : '';
     const siteArg = siteId ? [siteId] : [];
     if (keptIds.length > 0) {
-  const placeholders = keptIds.map(() => '?').join(',');
-  db.prepare(
-    `DELETE FROM UlpureData
-     WHERE DataSource = 'Calculated'
-       AND Id NOT IN (${placeholders})
-       AND ReviewStatus != 'Reviewed'
-       AND UlpureStatus != 'Validated'
-       ${siteClause}`
-  ).run(...keptIds, ...siteArg);
-} else {
-  db.prepare(
-    `DELETE FROM UlpureData
-     WHERE DataSource = 'Calculated'
-       AND ReviewStatus != 'Reviewed'
-       AND UlpureStatus != 'Validated'
-       ${siteClause}`
-  ).run(...siteArg);
-}
-  })();
+      const placeholders = keptIds.map(() => '?').join(',');
+      await t.run(
+        `DELETE FROM UlpureData
+         WHERE DataSource = 'Calculated'
+           AND Id NOT IN (${placeholders})
+           AND ReviewStatus != 'Reviewed'
+           AND UlpureStatus != 'Validated'
+           ${siteClause}`,
+        [...keptIds, ...siteArg]
+      );
+    } else {
+      await t.run(
+        `DELETE FROM UlpureData
+         WHERE DataSource = 'Calculated'
+           AND ReviewStatus != 'Reviewed'
+           AND UlpureStatus != 'Validated'
+           ${siteClause}`,
+        siteArg
+      );
+    }
+  });
 
   return results;
 }
 
-module.exports = { calculateAll, prevMonth, FORMULA_DESCRIPTIONS };
+module.exports = { calculateAll, prevMonth, FORMULA_DESCRIPTIONS, NRV_SUM_UTILITIES };

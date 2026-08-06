@@ -7,9 +7,9 @@ const {
 } = require('../services/formEntryService');
 
 // Create Entry
-const createFormEntry = (req, res, next) => {
+const createFormEntry = async (req, res, next) => {
   try {
-    const result = insertFormEntry(req.body);
+    const result = await insertFormEntry(req.body);
     res.status(201).json(result);
   } catch (error) {
     next(error);
@@ -17,9 +17,9 @@ const createFormEntry = (req, res, next) => {
 };
 
 // Get All Entries
-const getFormEntries = (req, res, next) => {
+const getFormEntries = async (req, res, next) => {
   try {
-    const result = fetchFormEntries(req.query);
+    const result = await fetchFormEntries(req.query);
     res.json(result);
   } catch (error) {
     next(error);
@@ -27,9 +27,9 @@ const getFormEntries = (req, res, next) => {
 };
 
 // Get Entry By Id
-const getFormEntryById = (req, res, next) => {
+const getFormEntryById = async (req, res, next) => {
   try {
-    const result = fetchFormEntryById(req.params.id);
+    const result = await fetchFormEntryById(req.params.id);
 
     if (!result) {
       return res.status(404).json({
@@ -44,9 +44,9 @@ const getFormEntryById = (req, res, next) => {
 };
 
 // Change Status (Approve / Reject from Validate page)
-const updateFormEntryStatus = (req, res, next) => {
+const updateFormEntryStatus = async (req, res, next) => {
   try {
-    const result = changeFormEntryStatus(
+    const result = await changeFormEntryStatus(
       req.params.id,
       req.body.status,
       req.body.changedBy
@@ -59,9 +59,9 @@ const updateFormEntryStatus = (req, res, next) => {
 };
 
 // Update Entry (Modify + Save from Validate Details Page)
-const editFormEntry = (req, res, next) => {
+const editFormEntry = async (req, res, next) => {
   try {
-    const result = updateFormEntryService(
+    const result = await updateFormEntryService(
       req.params.id,
       req.body,
       req.body.changedBy

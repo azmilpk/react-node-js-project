@@ -1,11 +1,11 @@
 const jwt = require('jsonwebtoken');
 const authService = require('../services/authService');
 
-const login = (req, res, next) => {
+const login = async (req, res, next) => {
   try {
     const { email, password } = req.body;
 
-    const user = authService.loginUser(email, password);
+    const user = await authService.loginUser(email, password);
 
     if (!user) {
       return res.status(401).json({ message: 'Invalid email or password' });
@@ -27,8 +27,7 @@ const login = (req, res, next) => {
       Name: user.Name,
       Email: user.Email,
       Role: user.Role,
-      SiteCode: user.SiteCode,
-      FacilityCode: user.FacilityCode,
+      LastLoginAt: user.LastLoginAt,
       token,
     });
 

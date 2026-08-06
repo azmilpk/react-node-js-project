@@ -18,7 +18,9 @@ const VALUE_SLOT_EXPLANATION =
   "A 'Value Slot' (V1, V2, V3, …) is one raw meter/account reading imported for the site and month. " +
   'A utility can have several meters in the same month (e.g. two water meters), each landing in its own slot — ' +
   'the formula below shows exactly how those slots are combined to produce this indicator.';
-function UlPurePage() {
+const NRV_SOURCE_EXPLANATION =
+  'NRV does not use meter Value Slots. Instead, this number is the total of every invoice row recorded for the ' +
+  'site and month that matches this indicator\u2019s category (e.g. all rows tagged "Diesel") \u2014 listed below so you can see exactly what was added up.';function UlPurePage() {
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -448,8 +450,8 @@ useEffect(() => {
 
       {formulaRow && (
         <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4">
-          <div className="w-full max-w-2xl bg-white rounded-[20px] shadow-xl overflow-hidden">
-            <div className="flex items-center justify-between px-5 py-4 border-b border-black/10">
+          <div className="w-full max-w-2xl max-h-[90vh] bg-white rounded-[20px] shadow-xl overflow-hidden flex flex-col">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-black/10 shrink-0">
               <div>
                 <h2 className="text-[18px] font-bold text-black">Formula Used</h2>
                 <p className="text-[13px] text-black/60">
@@ -459,12 +461,12 @@ useEffect(() => {
               <button
                 type="button"
                 onClick={() => setFormulaRow(null)}
-                className="min-w-[100px] h-[38px] px-4 rounded-full bg-black text-white text-[12px] font-semibold hover:bg-neutral-800 transition duration-300"
+                className="min-w-[100px] h-[38px] px-4 rounded-full bg-black text-white text-[12px] font-semibold hover:bg-neutral-800 transition duration-300 shrink-0"
               >
                 Close
               </button>
             </div>
-                        <div className="p-5 space-y-4">
+            <div className="p-5 space-y-4 overflow-y-auto">
               <div>
                 <h3 className="text-[13px] font-semibold text-black mb-1">Data Source: {formulaRow.dataSource}</h3>
                 <p className="text-[13px] text-black/70 leading-relaxed">
@@ -472,12 +474,33 @@ useEffect(() => {
                 </p>
               </div>
               <div>
-                <h3 className="text-[13px] font-semibold text-black mb-1">Value Slots</h3>
-                <p className="text-[13px] text-black/70 leading-relaxed">{VALUE_SLOT_EXPLANATION}</p>
+                <h3 className="text-[13px] font-semibold text-black mb-1">
+                  {formulaSources?.mode === 'aggregate' ? 'Source Rows' : 'Value Slots'}
+                </h3>
+                <p className="text-[13px] text-black/70 leading-relaxed">
+                  {formulaSources?.mode === 'aggregate' ? NRV_SOURCE_EXPLANATION : VALUE_SLOT_EXPLANATION}
+                </p>
                 {formulaSources && (
                   <div className="mt-3 space-y-2">
                     {[...formulaSources.currentMonth.rows, ...formulaSources.previousMonth.rows].length === 0 ? (
                       <p className="text-[12px] text-black/50">No raw meter rows recorded for this entry.</p>
+                    ) : formulaSources.mode === 'aggregate' ? (
+                      <div>
+                        <p className="text-[11px] font-semibold text-black/50 mb-1">
+                          {formulaSources.currentMonth.month} — {formulaSources.currentMonth.rows.length} row
+                          {formulaSources.currentMonth.rows.length === 1 ? '' : 's'} added together
+                        </p>
+                        {formulaSources.currentMonth.rows.map((r) => (
+                          <p key={`agg-${r.Id}`} className="text-[12px] text-black/70">
+                            {r.AccountNumber || 'Unnamed account'} = {r.Consumption} {r.Units || ''}
+                            {' '}— <span className="font-semibold">Source: {r.DataSource || 'Unknown'}</span>
+                          </p>
+                        ))}
+                        <p className="text-[12px] text-black/70 mt-1">
+                          Total: {formulaSources.currentMonth.rows.reduce((sum, r) => sum + (Number(r.Consumption) || 0), 0)} {formulaSources.currentMonth.rows[0]?.Units || ''}
+                          {' '}(should match the Consumption shown above)
+                        </p>
+                      </div>
                     ) : (
                       <>
                         {formulaSources.currentMonth.rows.length > 0 && (
@@ -487,7 +510,7 @@ useEffect(() => {
                             </p>
                             {formulaSources.currentMonth.rows.map((r) => (
                               <p key={`cur-${r.Id}`} className="text-[12px] text-black/70">
-                                {r.ValueSlot}: {r.AccountNumber || 'Unnamed meter'} = {r.Consumption} {r.Units || ''}
+                                {r.ValueSlot || 'Row'}: {r.AccountNumber || 'Unnamed meter'} = {r.Consumption} {r.Units || ''}
                                 {' '}— <span className="font-semibold">Source: {r.DataSource || 'Unknown'}</span>
                               </p>
                             ))}
@@ -500,7 +523,7 @@ useEffect(() => {
                             </p>
                             {formulaSources.previousMonth.rows.map((r) => (
                               <p key={`prev-${r.Id}`} className="text-[12px] text-black/70">
-                                {r.ValueSlot}: {r.AccountNumber || 'Unnamed meter'} = {r.Consumption} {r.Units || ''}
+                                {r.ValueSlot || 'Row'}: {r.AccountNumber || 'Unnamed meter'} = {r.Consumption} {r.Units || ''}
                                 {' '}— <span className="font-semibold">Source: {r.DataSource || 'Unknown'}</span>
                               </p>
                             ))}

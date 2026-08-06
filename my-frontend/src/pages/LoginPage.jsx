@@ -104,7 +104,7 @@ function LoginPage() {
           <div className="space-y-3 text-left">
             <div>
               <label className="block text-[13px] font-semibold text-white mb-2">
-                Email
+                Emails
               </label>
               <input
                 type="email"

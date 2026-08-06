@@ -1,4 +1,5 @@
 const { BlobServiceClient } = require('@azure/storage-blob');
+const path = require('path');
 const db = require('../config/db');
 
 const getBlobServiceClient = () => {
@@ -74,14 +75,14 @@ const streamBlobToResponse = async (blobUrl, res) => {
 
   // Ownership check: the blob must be referenced by a stored record so a user
   // cannot enumerate/read arbitrary blobs in the container.
-  const referenced = db
-    .prepare(
-      `SELECT 1 FROM GtoInvoices WHERE PdfFile = ?
+  const referenced = await db.get(
+    `SELECT TOP 1 1 AS ok FROM (
+       SELECT 1 AS ok FROM GtoInvoices WHERE PdfFile = ?
        UNION
-       SELECT 1 FROM UlpureData WHERE FileUrl = ?
-       LIMIT 1`
-    )
-    .get(blobUrl, blobUrl);
+       SELECT 1 AS ok FROM UlpureData WHERE FileUrl = ?
+     ) refs`,
+    [blobUrl, blobUrl]
+  );
   if (!referenced) {
     return res.status(403).json({ message: 'File not accessible' });
   }
@@ -100,7 +101,15 @@ const streamBlobToResponse = async (blobUrl, res) => {
     res.setHeader('Content-Type', downloadResponse.contentType);
   }
 
-  res.setHeader('Content-Disposition', 'inline');
+  // Excel/CSV can't render in the browser, so force a download instead of
+  // trying (and failing) to preview them inline everywhere they're viewed.
+  const EXCEL_EXTENSIONS = new Set(['.xlsx', '.xls', '.csv']);
+  const ext = path.extname(blobName).toLowerCase();
+  if (EXCEL_EXTENSIONS.has(ext)) {
+    res.setHeader('Content-Disposition', `attachment; filename="${path.basename(blobName)}"`);
+  } else {
+    res.setHeader('Content-Disposition', 'inline');
+  }
   res.setHeader('Cache-Control', 'private, max-age=86400');
 
   downloadResponse.readableStreamBody.pipe(res);

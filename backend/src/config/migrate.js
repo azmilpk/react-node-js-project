@@ -1,9 +1,16 @@
+// ─────────────────────────────────────────────────────────────────────────────
+// Azure SQL migration: schema is now managed EXTERNALLY.
+// This startup migration is intentionally disabled — the app no longer creates,
+// alters, seeds, or drops any tables/columns. Provision and evolve the schema
+// directly in Azure SQL (tables are added gradually). The legacy SQLite DDL
+// below is kept for reference only and never executes because of this return.
+// ─────────────────────────────────────────────────────────────────────────────
+console.log('Schema managed externally (Azure SQL) — startup migration skipped.');
+return;
+
+// eslint-disable-next-line no-unreachable
 const db = require('./db');
 
-// NOTE: The legacy `FormEntries` table is RETIRED. Both bot and manual entries
-// now land directly in the single `GtoInvoices` table (see the manual-entry
-// columns added further below). The old table is dropped here so it can never
-// be written to again; this is a no-op once it's gone.
 db.exec('DROP TABLE IF EXISTS FormEntries;');
 
 db.exec(`

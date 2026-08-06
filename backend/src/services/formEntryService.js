@@ -10,17 +10,18 @@ const { logFieldChanges } = require('./auditService');
 // DIRECT (pass-through) formula so the calc engine echoes it straight //
 // into UlpureData without applying meter-delta math.                  //
 // ------------------------------------------------------------------ //
-const resolveSiteId = (siteName) => {
+const resolveSiteId = async (siteName) => {
   if (!siteName) return null;
-  const row = db.prepare('SELECT Id FROM Sites WHERE SiteName = ?').get(siteName);
+  const row = await db.get('SELECT Id FROM Sites WHERE SiteName = ?', [siteName]);
   return row ? row.Id : null;
 };
 
-const resolveUtilityId = (utilityName) => {
+const resolveUtilityId = async (utilityName) => {
   if (!utilityName) return null;
-  const row = db
-    .prepare('SELECT Id FROM UtilityTypes WHERE UtilityName = ?')
-    .get(utilityName);
+  const row = await db.get(
+    'SELECT UtilityTypeID AS Id FROM UtilityTypes WHERE UtilityName = ?',
+    [utilityName]
+  );
   return row ? row.Id : null;
 };
 
@@ -93,105 +94,56 @@ const ENTRY_COLUMNS = `
   g.Id AS Id,
   s.SiteName AS SiteCode,
   s.SiteName AS Site,
-  g.Facility AS FacilityCode,
-  COALESCE(u.UtilityName, g.TemplateType) AS UtilityName,
-  g.PostingDateMonth AS PostingMonth,
-  g.AccountNumber AS AccountMeterNo,
-  g.Units AS Units,
+  g.facility AS FacilityCode,
+  g.Templatetype AS UtilityName,
+  g.Postingdatemonth AS PostingMonth,
+  g.Accountnumber AS AccountMeterNo,
+  g.units AS Units,
   g.Consumption AS Consumption,
-  g.PreviousConsumption AS PreviousConsumption,
-  g.InvoiceDate AS InvoiceDate,
-  g.InvoiceNo AS InvoiceNo,
+  NULL AS PreviousConsumption,
+  g.Invoicedate AS InvoiceDate,
+  NULL AS InvoiceNo,
   COALESCE(g.Status, 'Pending') AS Status,
-  g.BotStatus AS BotStatus,
-  g.ValidateUser AS ValidateUser,
-  g.ValidatorLoginTime AS ValidatorLoginTime,
-  g.Approver AS Approver,
+  g.Botstatus AS BotStatus,
+  g.Validateuser AS ValidateUser,
+  g.validatorLoginTime AS ValidatorLoginTime,
+  NULL AS Approver,
   g.Comments AS Comment,
-  g.CreatedBy AS CreatedBy,
-  g.CreatedAt AS CreatedAt,
-  g.ModifiedBy AS ModifiedBy,
-  g.ModifiedAt AS ModifiedAt,
-  g.DataSource AS DataSource
+  NULL AS CreatedBy,
+  g.createddate AS CreatedAt,
+  NULL AS ModifiedBy,
+  NULL AS ModifiedAt,
+  g.Datasource AS DataSource,
+  g.PdfFile AS FileUrl
 `;
 
 const selectEntryById = (id) =>
-  db
-    .prepare(
-      `SELECT ${ENTRY_COLUMNS}
-       FROM GtoInvoices g
+  db.get(
+    `SELECT ${ENTRY_COLUMNS}
+       FROM Gto_Invoices g
        LEFT JOIN Sites s ON s.Id = g.SiteId
-       LEFT JOIN UtilityTypes u ON u.Id = g.UtilityTypeId
-       WHERE g.Id = ?`
-    )
-    .get(id);
+       WHERE g.Id = ?`,
+    [id]
+  );
 
 // Create Entry
-const insertFormEntry = (data) => {
+const insertFormEntry = async (data) => {
   const slotSeed = `E${Date.now()}`;
   const siteCode = data.siteCode || '';
   const utilityName = data.utilityName || data.utilityCode || '';
   const accountMeterNo = data.accountMeterNo || '';
   const valueSlot = resolveValueSlot(siteCode, accountMeterNo, slotSeed);
   const formulaCode = FORMULA_CODE_BY_UTILITY[utilityName] || 'DIRECT';
+  const postingMonth = data.postingMonth || '';
+  const utilityTypeId = await resolveUtilityId(utilityName);
+  const siteId = await resolveSiteId(siteCode);
 
-  const stmt = db.prepare(`
-    INSERT INTO GtoInvoices
-    (
-      PostingDateMonth,
-      AccountNumber,
-      Units,
-      Consumption,
-      Status,
-      CreatedBy,
-      PdfFile,
-      Comments,
-      InvoiceDate,
-      InvoiceNo,
-      BotStatus,
-      ValidateUser,
-      ValidatorLoginTime,
-      Approver,
-      DataSource,
-      UtilityTypeId,
-      SiteId,
-      TemplateType,
-      Facility,
-      ValueSlot,
-      FormulaCode
-    )
-    VALUES
-    (
-      @postingMonth,
-      @accountNumber,
-      @units,
-      @consumption,
-      @status,
-      @createdBy,
-      @pdfFile,
-      @comment,
-      @invoiceDate,
-      @invoiceNo,
-      @botStatus,
-      @validateUser,
-      @validatorLoginTime,
-      @approver,
-      'FormEntry',
-      @utilityTypeId,
-      @siteId,
-      @templateType,
-      @facility,
-      @valueSlot,
-      @formulaCode
-    )
-  `);
-
-  const result = stmt.run({
-    postingMonth: data.postingMonth || '',
+  const params = {
+    postingMonth,
     accountNumber: accountMeterNo || utilityName || '',
     units: data.units || '',
     consumption: Number(data.consumption) || 0,
-    status: data.status || 'Validated',
+    status: data.status || 'Pending',
     createdBy: data.createdBy || 'frontend-user',
     pdfFile: data.fileUrl || '',
     comment: data.comment || '',
@@ -201,28 +153,122 @@ const insertFormEntry = (data) => {
     validateUser: data.validateUser || null,
     validatorLoginTime: data.validatorLoginTime || null,
     approver: data.approver || null,
-    utilityTypeId: resolveUtilityId(utilityName),
-    siteId: resolveSiteId(siteCode),
+    utilityTypeId,
+    siteId,
     templateType: utilityName,
-    facility: data.facilityCode || '',
+    site: data.facilityCode || '',
+    facility: siteCode || '',
     valueSlot,
     formulaCode,
-  });
+  };
+
+  // One row per site/utility/meter-slot/month (UX_GtoInvoices_source). A
+  // resubmission for the same combo (e.g. correcting a mistake) updates the
+  // existing row instead of throwing a UNIQUE constraint error and losing the data.
+  const existing = await db.get(
+    `SELECT Id FROM Gto_Invoices
+       WHERE ((SiteId = @siteId) OR (SiteId IS NULL AND @siteId IS NULL))
+         AND ((UtilityTypeId = @utilityTypeId) OR (UtilityTypeId IS NULL AND @utilityTypeId IS NULL))
+         AND ValueSlot = @valueSlot AND PostingDateMonth = @postingMonth`,
+    { siteId, utilityTypeId, valueSlot, postingMonth }
+  );
+
+  if (existing) {
+    await db.run(
+      `UPDATE Gto_Invoices SET
+        AccountNumber = @accountNumber,
+        Units = @units,
+        Consumption = @consumption,
+        Status = @status,
+        PdfFile = @pdfFile,
+        Comments = @comment,
+        InvoiceDate = @invoiceDate,
+        InvoiceNo = @invoiceNo,
+        BotStatus = @botStatus,
+        ValidateUser = @validateUser,
+        ValidatorLoginTime = @validatorLoginTime,
+        Approver = @approver,
+        DataSource = 'FormEntry',
+        TemplateType = @templateType,
+        Site = @site,
+        Facility = @facility,
+        FormulaCode = @formulaCode,
+        ModifiedBy = @createdBy,
+        ModifiedAt = GETDATE()
+      WHERE Id = @id`,
+      { ...params, id: existing.Id }
+    );
+
+    return selectEntryById(existing.Id);
+  }
+
+  const result = await db.run(
+    `INSERT INTO Gto_Invoices
+      (
+        PostingDateMonth,
+        AccountNumber,
+        Units,
+        Consumption,
+        Status,
+        CreatedBy,
+        PdfFile,
+        Comments,
+        InvoiceDate,
+        InvoiceNo,
+        BotStatus,
+        ValidateUser,
+        ValidatorLoginTime,
+        Approver,
+        DataSource,
+        UtilityTypeId,
+        SiteId,
+        TemplateType,
+        Site,
+        Facility,
+        ValueSlot,
+        FormulaCode
+      )
+      VALUES
+      (
+        @postingMonth,
+        @accountNumber,
+        @units,
+        @consumption,
+        @status,
+        @createdBy,
+        @pdfFile,
+        @comment,
+        @invoiceDate,
+        @invoiceNo,
+        @botStatus,
+        @validateUser,
+        @validatorLoginTime,
+        @approver,
+        'FormEntry',
+        @utilityTypeId,
+        @siteId,
+        @templateType,
+        @site,
+        @facility,
+        @valueSlot,
+        @formulaCode
+      )`,
+    params
+  );
 
   return selectEntryById(result.lastInsertRowid);
 };
 
 // Get All Entries
-const fetchFormEntries = (query) => {
+const fetchFormEntries = async (query) => {
   let sql = `SELECT ${ENTRY_COLUMNS}
-       FROM GtoInvoices g
+       FROM Gto_Invoices g
        LEFT JOIN Sites s ON s.Id = g.SiteId
-       LEFT JOIN UtilityTypes u ON u.Id = g.UtilityTypeId
        WHERE 1=1`;
   const params = [];
 
   if (query.facilityCode) {
-    sql += ' AND g.Facility = ?';
+    sql += ' AND g.site = ?';
     params.push(query.facilityCode);
   }
 
@@ -238,15 +284,15 @@ const fetchFormEntries = (query) => {
 
   sql += ' ORDER BY g.Id DESC';
 
-  return db.prepare(sql).all(...params);
+  return db.all(sql, params);
 };
 
 // Get Entry By Id
 const fetchFormEntryById = (id) => selectEntryById(id);
 
 // Change Status (Approve from the Validate page)
-const changeFormEntryStatus = (id, status, changedBy) => {
-  const entry = db.prepare('SELECT * FROM GtoInvoices WHERE Id = ?').get(id);
+const changeFormEntryStatus = async (id, status, changedBy) => {
+  const entry = await db.get('SELECT * FROM Gto_Invoices WHERE Id = ?', [id]);
   if (!entry) throw new Error('Entry not found');
 
   let finalStatus = status;
@@ -254,7 +300,7 @@ const changeFormEntryStatus = (id, status, changedBy) => {
     finalStatus = 'Modified and Validated';
   }
 
-  logFieldChanges({
+  await logFieldChanges({
     tableName: 'GtoInvoices',
     recordId: id,
     oldRecord: entry,
@@ -262,13 +308,16 @@ const changeFormEntryStatus = (id, status, changedBy) => {
     changedBy: changedBy || 'Unknown User',
   });
 
-  db.prepare('UPDATE GtoInvoices SET Status = ?, ModifiedBy = ?, ModifiedAt = datetime(\'now\') WHERE Id = ?').run(finalStatus, changedBy || 'Unknown User', id);
+  await db.run(
+    "UPDATE Gto_Invoices SET Status = ?, ModifiedBy = ?, ModifiedAt = GETDATE() WHERE Id = ?",
+    [finalStatus, changedBy || 'Unknown User', id]
+  );
   return selectEntryById(id);
 };
 
 // Update Entry (Modify + Save from the Validate Details page)
-const updateFormEntry = (id, data) => {
-  const entry = db.prepare('SELECT * FROM GtoInvoices WHERE Id = ?').get(id);
+const updateFormEntry = async (id, data) => {
+  const entry = await db.get('SELECT * FROM Gto_Invoices WHERE Id = ?', [id]);
 
   if (!entry) {
     throw new Error('Entry not found');
@@ -303,7 +352,7 @@ const updateFormEntry = (id, data) => {
     Status: nextStatus,
   };
 
-  logFieldChanges({
+  await logFieldChanges({
     tableName: 'GtoInvoices',
     recordId: id,
     oldRecord: entry,
@@ -311,23 +360,24 @@ const updateFormEntry = (id, data) => {
     changedBy,
   });
 
-  db.prepare(`
-    UPDATE GtoInvoices
+  await db.run(
+    `UPDATE Gto_Invoices
     SET
       PostingDateMonth = ?,
       Consumption = ?,
       Comments = ?,
       Status = ?,
       ModifiedBy = ?,
-      ModifiedAt = datetime('now')
-    WHERE Id = ?
-  `).run(
-    newValues.PostingDateMonth,
-    newValues.Consumption,
-    newValues.Comments,
-    newValues.Status,
-    changedBy,
-    id
+      ModifiedAt = GETDATE()
+    WHERE Id = ?`,
+    [
+      newValues.PostingDateMonth,
+      newValues.Consumption,
+      newValues.Comments,
+      newValues.Status,
+      changedBy,
+      id,
+    ]
   );
 
   return selectEntryById(id);

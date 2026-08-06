@@ -8,7 +8,7 @@
 
 const XLSX = require('xlsx');
 const db = require('../config/db');
-require('../config/migrate'); // ensure tables + seed lookups exist
+require('dotenv').config();
 
 // ─── EDITABLE MAPPINGS ───────────────────────────────────────────────────────
 
@@ -152,19 +152,7 @@ const toISOTime = (v) =>
     ? v.toISOString().slice(11, 19)
     : v ? String(v) : null;
 
-const siteIdByName = new Map(
-  db.prepare('SELECT Id, SiteName FROM Sites').all().map((r) => [r.SiteName, r.Id])
-);
-const utilityIdByName = new Map(
-  db.prepare('SELECT Id, UtilityName FROM UtilityTypes').all().map((r) => [r.UtilityName, r.Id])
-);
-
-const workbook = XLSX.readFile(filePath, { cellDates: true });
-const sheetName = workbook.SheetNames[0];
-const rows = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName], { defval: '' });
-console.log(`Read ${rows.length} rows from sheet "${sheetName}"`);
-
-const insert = db.prepare(`
+const INSERT_SQL = `
   INSERT INTO GtoInvoices (
     AccountNumber, ValueSlot, Consumption, PreviousConsumption,
     FreshWaterStaticValue, EvaporationFactorValue, ConstantValue,
@@ -177,12 +165,27 @@ const insert = db.prepare(`
     @invoiceDate, @postingDateMonth, @botStatus, @dataSource,
     @utilityTypeId, @siteId, @templateType, @facility, @units, @formulaCode,
     @pdfFile, @invoiceNo, @validateUser, @approver, @comments, @validatorLoginTime
-  )
-`);
+  )`;
 
 const unmappedAccounts = new Set();
 
-const mapRow = (r) => {
+async function main() {
+  const siteIdByName = new Map(
+    (await db.all('SELECT Id, SiteName FROM Sites')).map((r) => [r.SiteName, r.Id])
+  );
+  const utilityIdByName = new Map(
+    (await db.all('SELECT UtilityTypeID AS Id, UtilityName FROM UtilityTypes')).map((r) => [
+      r.UtilityName,
+      r.Id,
+    ])
+  );
+
+  const workbook = XLSX.readFile(filePath, { cellDates: true });
+  const sheetName = workbook.SheetNames[0];
+  const rows = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName], { defval: '' });
+  console.log(`Read ${rows.length} rows from sheet "${sheetName}"`);
+
+  const mapRow = (r) => {
   const templateType = r.Templatetype || '';
   const account = r.Accountnumber || '';
   const site = r.site || '';
@@ -242,20 +245,28 @@ const mapRow = (r) => {
   };
 };
 
-const run = db.transaction(() => {
   const mapped = rows.map(mapRow);
-  // Idempotent per site: clear only the sites present in this file, then insert.
-  const siteIds = new Set();
-  for (const m of mapped) if (m.siteId) siteIds.add(m.siteId);
-  const del = db.prepare('DELETE FROM GtoInvoices WHERE SiteId = ?');
-  for (const id of siteIds) del.run(id);
-  for (const m of mapped) insert.run(m);
-});
+  await db.transaction(async (t) => {
+    // Idempotent per site: clear only the sites present in this file, then insert.
+    const siteIds = new Set();
+    for (const m of mapped) if (m.siteId) siteIds.add(m.siteId);
+    for (const id of siteIds) {
+      await t.run('DELETE FROM GtoInvoices WHERE SiteId = ?', [id]);
+    }
+    for (const m of mapped) await t.run(INSERT_SQL, m);
+  });
 
-run();
-console.log(`Imported ${rows.length} rows into GtoInvoices.`);
+  console.log(`Imported ${rows.length} rows into GtoInvoices.`);
 
-if (unmappedAccounts.size > 0) {
-  console.log(`\nWARNING: ${unmappedAccounts.size} account(s) have no ValueSlot (imported as NULL). Add them to ACCOUNT_VALUE_SLOT:`);
-  [...unmappedAccounts].sort().forEach((a) => console.log('   -', a));
+  if (unmappedAccounts.size > 0) {
+    console.log(`\nWARNING: ${unmappedAccounts.size} account(s) have no ValueSlot (imported as NULL). Add them to ACCOUNT_VALUE_SLOT:`);
+    [...unmappedAccounts].sort().forEach((a) => console.log('   -', a));
+  }
 }
+
+main()
+  .then(() => process.exit(0))
+  .catch((err) => {
+    console.error(err);
+    process.exit(1);
+  });

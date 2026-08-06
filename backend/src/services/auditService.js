@@ -1,26 +1,32 @@
 const db = require('../config/db');
 
-const logChange = ({ tableName, recordId, fieldName, oldValue, newValue, changedBy }) => {
+// `client` lets a caller run the insert inside an open transaction (pass the
+// tx-scoped api); defaults to the pool-level helpers.
+const logChange = async (
+  { tableName, recordId, fieldName, oldValue, newValue, changedBy },
+  client = db
+) => {
   if (String(oldValue ?? '') === String(newValue ?? '')) {
     return;
   }
 
-  db.prepare(`
-    INSERT INTO AuditLog (TableName, RecordId, FieldName, OldValue, NewValue, ChangedBy)
-    VALUES (?, ?, ?, ?, ?, ?)
-  `).run(
-    tableName,
-    recordId,
-    fieldName,
-    oldValue !== undefined && oldValue !== null ? String(oldValue) : '',
-    newValue !== undefined && newValue !== null ? String(newValue) : '',
-    changedBy || 'Unknown User'
+  await client.run(
+    `INSERT INTO AuditLog (TableName, RecordId, FieldName, OldValue, NewValue, ChangedBy)
+     VALUES (?, ?, ?, ?, ?, ?)`,
+    [
+      tableName,
+      recordId,
+      fieldName,
+      oldValue !== undefined && oldValue !== null ? String(oldValue) : '',
+      newValue !== undefined && newValue !== null ? String(newValue) : '',
+      changedBy || 'Unknown User',
+    ]
   );
 };
 
-const logFieldChanges = ({ tableName, recordId, oldRecord, newFields, changedBy }) => {
-  Object.keys(newFields).forEach((field) => {
-    logChange({
+const logFieldChanges = async ({ tableName, recordId, oldRecord, newFields, changedBy }) => {
+  for (const field of Object.keys(newFields)) {
+    await logChange({
       tableName,
       recordId,
       fieldName: field,
@@ -28,39 +34,41 @@ const logFieldChanges = ({ tableName, recordId, oldRecord, newFields, changedBy 
       newValue: newFields[field],
       changedBy,
     });
-  });
+  }
 };
-const fetchCombinedUlPureHistory = (ulPureId) => {
-  const entry = db
-    .prepare('SELECT SourceEntryId FROM UlpureData WHERE Id = ?')
-    .get(ulPureId);
+const fetchCombinedUlPureHistory = async (ulPureId) => {
+  const entry = await db.get(
+    'SELECT SourceEntryId FROM UlpureData WHERE Id = ?',
+    [ulPureId]
+  );
 
-  const ulPureLogs = db
-    .prepare(`SELECT * FROM AuditLog WHERE TableName IN ('UlpureData', 'UlPureEntries') AND RecordId = ?`)
-    .all(ulPureId);
+  const ulPureLogs = await db.all(
+    `SELECT * FROM AuditLog WHERE TableName IN ('UlpureData', 'UlPureEntries') AND RecordId = ?`,
+    [ulPureId]
+  );
 
   let formLogs = [];
   if (entry && entry.SourceEntryId) {
-    formLogs = db
-      .prepare(`SELECT * FROM AuditLog WHERE TableName = 'GtoInvoices' AND RecordId = ?`)
-      .all(entry.SourceEntryId);
+    formLogs = await db.all(
+      `SELECT * FROM AuditLog WHERE TableName = 'GtoInvoices' AND RecordId = ?`,
+      [entry.SourceEntryId]
+    );
   }
 
   return [...ulPureLogs, ...formLogs].sort(
     (a, b) => new Date(b.ChangedAt) - new Date(a.ChangedAt)
   );
 };
-const fetchAuditHistory = (tableName, recordId) => {
+const fetchAuditHistory = async (tableName, recordId) => {
   if (tableName === 'UlPureEntries' || tableName === 'UlpureData') {
     return fetchCombinedUlPureHistory(recordId);
   }
-  return db
-    .prepare(`
-      SELECT * FROM AuditLog
+  return db.all(
+    `SELECT * FROM AuditLog
       WHERE TableName = ? AND RecordId = ?
-      ORDER BY ChangedAt DESC
-    `)
-    .all(tableName, recordId);
+      ORDER BY ChangedAt DESC`,
+    [tableName, recordId]
+  );
 };
 module.exports = {
   logChange,

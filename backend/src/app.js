@@ -1,9 +1,5 @@
 require('dotenv').config();
-// Only create/seed tables against the local SQLite dev database.
-// When pointed at an external DB (DB_CLIENT=mssql), never run schema migrations or seeds.
-if ((process.env.DB_CLIENT || 'sqlite').toLowerCase() !== 'mssql') {
-  require('./config/migrate');
-}
+// Schema is managed externally in Azure SQL — no startup migrations/seeds.
 
 const express = require('express');
 const cors = require('cors');
@@ -43,9 +39,9 @@ app.get('/', (req, res) => {
   res.json({ message: 'Backend is running' });
 });
 
-app.get('/api/test-db', (req, res) => {
+app.get('/api/test-db', async (req, res) => {
   try {
-    const result = db.prepare("SELECT datetime('now') AS currentTime").get();
+    const result = await db.get('SELECT GETDATE() AS currentTime');
     res.json({ message: 'Database connected successfully', data: result });
   } catch (error) {
     res.status(500).json({ message: 'Database connection failed', error: error.message });

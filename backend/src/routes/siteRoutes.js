@@ -7,11 +7,12 @@ const { getSites } = require('../controllers/siteController');
 
 router.get('/', getSites);
 
-router.get('/:siteCode/utilities', (req, res) => {
+router.get('/:siteCode/utilities', async (req, res) => {
   try {
     const { siteCode } = req.params;
 
-    const stmt = db.prepare(`
+    const rows = await db.all(
+      `
       SELECT
         UtilityCode AS utilityCode,
         UtilityName AS utilityName,
@@ -20,9 +21,9 @@ router.get('/:siteCode/utilities', (req, res) => {
       FROM SiteUtilities
       WHERE SiteCode = ? AND IsActive = 1
       ORDER BY UtilityName
-    `);
-
-    const rows = stmt.all(siteCode);
+    `,
+      [siteCode]
+    );
 
     res.json(rows);
   } catch (error) {
@@ -33,18 +34,18 @@ router.get('/:siteCode/utilities', (req, res) => {
   }
 });
 
-router.get('/:siteCode/utilities/:utilityCode/form', (req, res) => {
+router.get('/:siteCode/utilities/:utilityCode/form', async (req, res) => {
   try {
     const { siteCode, utilityCode } = req.params;
 
-    const stmt = db.prepare(`
-      SELECT FormJson
+    const row = await db.get(
+      `
+      SELECT TOP 1 FormJson
       FROM UtilityFormDefinitions
       WHERE SiteCode = ? AND UtilityCode = ? AND IsActive = 1
-      LIMIT 1
-    `);
-
-    const row = stmt.get(siteCode, utilityCode);
+    `,
+      [siteCode, utilityCode]
+    );
 
     if (!row) {
       return res.status(404).json({

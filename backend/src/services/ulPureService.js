@@ -1,6 +1,7 @@
 const db = require('../config/db');
+const REGON_IDS = require('../config/regonIds');
 const { logFieldChanges } = require('./auditService');
-const { calculateAll, prevMonth, FORMULA_DESCRIPTIONS } = require('./calculationService');
+const { calculateAll, prevMonth, FORMULA_DESCRIPTIONS, NRV_SUM_UTILITIES } = require('./calculationService');
 
 // Aliased column list: returns UlpureData rows using the legacy UlPureEntries
 // field names so existing controllers / frontend keep working unchanged.
@@ -34,24 +35,30 @@ const UL_COLUMNS = `
   FormulaCode,
   IndicatorName,
   IndicatorId,
-  DataSource,
-  COALESCE(
-    (SELECT RegonId FROM Sites WHERE Sites.Id = UlpureData.SiteId),
-    (SELECT RegonId FROM Sites WHERE Sites.SiteName = UlpureData.Site)
-  ) AS RegonId
+  DataSource
 `;
 
 // Resolve normalized FK ids from free-text names (null-tolerant).
-const siteIdStmt = db.prepare('SELECT Id FROM Sites WHERE SiteName = ?');
-const utilityIdStmt = db.prepare('SELECT Id FROM UtilityTypes WHERE UtilityName = ?');
-const resolveSiteId = (name) => (name ? siteIdStmt.get(name)?.Id ?? null : null);
-const resolveUtilityId = (name) => (name ? utilityIdStmt.get(name)?.Id ?? null : null);
+const resolveSiteId = async (name) => {
+  if (!name) return null;
+  const row = await db.get('SELECT Id FROM Sites WHERE SiteName = ?', [name]);
+  return row ? row.Id : null;
+};
+const resolveUtilityId = async (name) => {
+  if (!name) return null;
+  const row = await db.get(
+    'SELECT UtilityTypeID AS Id FROM UtilityTypes WHERE UtilityName = ?',
+    [name]
+  );
+  return row ? row.Id : null;
+};
 
 // Insert a manual (form-generated) row into UL Pure
-const insertUlPureEntryFromFormEntry = (formEntry) => {
-  const existing = db
-    .prepare('SELECT * FROM UlpureData WHERE SourceEntryId = ?')
-    .get(formEntry.Id);
+const insertUlPureEntryFromFormEntry = async (formEntry) => {
+  const existing = await db.get(
+    'SELECT * FROM UlpureData WHERE SourceEntryId = ?',
+    [formEntry.Id]
+  );
 
   if (existing) {
     return existing;
@@ -59,8 +66,8 @@ const insertUlPureEntryFromFormEntry = (formEntry) => {
 
   const utilityName = formEntry.UtilityName || formEntry.UtilityCode || '';
 
-  const stmt = db.prepare(`
-    INSERT INTO UlpureData (
+  const result = await db.run(
+    `INSERT INTO UlpureData (
       SourceEntryId,
       EntryNumber,
       FacilityCode,
@@ -105,35 +112,32 @@ const insertUlPureEntryFromFormEntry = (formEntry) => {
       @fileUrl,
       @createdBy,
       'Manual'
-    )
-  `);
+    )`,
+    {
+      sourceEntryId: formEntry.Id,
+      entryNumber: formEntry.EntryNumber || '',
+      facilityCode: formEntry.FacilityCode || '',
+      siteCode: formEntry.SiteCode || '',
+      site: formEntry.SiteCode || '',
+      facility: formEntry.FacilityCode || '',
+      entryName: formEntry.EntryName || '',
+      utilityCode: formEntry.UtilityCode || '',
+      utilityTypeId: await resolveUtilityId(utilityName),
+      siteId: await resolveSiteId(formEntry.SiteCode),
+      utility: utilityName,
+      postingMonth: formEntry.PostingMonth || '',
+      accountMeterNo: formEntry.AccountMeterNo || '',
+      units: formEntry.Units || '',
+      consumption: formEntry.Consumption || 0,
+      status: 'Validate', // <-- BLUE STATUS
+      comment: formEntry.Comment || '',
+      fileName: formEntry.FileName || '',
+      fileUrl: formEntry.FileUrl || '',
+      createdBy: formEntry.CreatedBy || '',
+    }
+  );
 
-  const result = stmt.run({
-    sourceEntryId: formEntry.Id,
-    entryNumber: formEntry.EntryNumber || '',
-    facilityCode: formEntry.FacilityCode || '',
-    siteCode: formEntry.SiteCode || '',
-    site: formEntry.SiteCode || '',
-    facility: formEntry.FacilityCode || '',
-    entryName: formEntry.EntryName || '',
-    utilityCode: formEntry.UtilityCode || '',
-    utilityTypeId: resolveUtilityId(utilityName),
-    siteId: resolveSiteId(formEntry.SiteCode),
-    utility: utilityName,
-    postingMonth: formEntry.PostingMonth || '',
-    accountMeterNo: formEntry.AccountMeterNo || '',
-    units: formEntry.Units || '',
-    consumption: formEntry.Consumption || 0,
-    status: 'Validate', // <-- BLUE STATUS
-    comment: formEntry.Comment || '',
-    fileName: formEntry.FileName || '',
-    fileUrl: formEntry.FileUrl || '',
-    createdBy: formEntry.CreatedBy || '',
-  });
-
-  return db
-    .prepare('SELECT * FROM UlpureData WHERE Id = ?')
-    .get(result.lastInsertRowid);
+  return db.get('SELECT * FROM UlpureData WHERE Id = ?', [result.lastInsertRowid]);
 };
 
 
@@ -141,7 +145,7 @@ const insertUlPureEntryFromFormEntry = (formEntry) => {
 // Generate UL Pure
 const ALLOWED_STATUSES = ['Validated', 'Modified and Validated'];
 
-const moveModifiedValidatedEntriesToUlPure = ({
+const moveModifiedValidatedEntriesToUlPure = async ({
   site,
 }) => {
   // ── Validation rules: must all pass before any calculation runs ──
@@ -155,13 +159,12 @@ const moveModifiedValidatedEntriesToUlPure = ({
     scopeParams.push(site);
   }
 
-  const allEntries = db
-    .prepare(
-      `SELECT Id, COALESCE(Status, 'Pending') AS Status,
+  const allEntries = await db.all(
+    `SELECT Id, COALESCE(Status, 'Pending') AS Status,
               PostingDateMonth AS PostingMonth
-         FROM GtoInvoices${scopeWhere}`
-    )
-    .all(...scopeParams);
+         FROM GtoInvoices${scopeWhere}`,
+    scopeParams
+  );
 
   if (allEntries.length === 0) {
     const err = new Error(
@@ -191,7 +194,9 @@ const moveModifiedValidatedEntriesToUlPure = ({
   // Rule 2: Köping's delta indicators (Water, District Heating) need a
   // previous-month baseline, so it requires at least two distinct months. Other
   // sites are pass-through / aggregation and calculate fine from a single month.
-  if (!site || site === 'Köping') {
+  // Only gate this when the generate is actually scoped to Köping — a global
+  // "all sites" generate must not be blocked by Köping's baseline requirement.
+  if (site === 'Köping') {
     const months = [...new Set(allEntries.map((e) => e.PostingMonth).filter(Boolean))];
     if (months.length < 2) {
       const err = new Error(
@@ -208,7 +213,7 @@ const moveModifiedValidatedEntriesToUlPure = ({
   // This does NOT move/promote form entries into UL Pure. It runs the backend
   // calc engine, which reads the raw GtoInvoices data and (re)writes only the
   // Calculated indicator rows — scoped to the selected site when provided.
-  const results = calculateAll({ site });
+  const results = await calculateAll({ site });
   const calculatedCount = results.filter((r) => !r.skipped).length;
 
   return {
@@ -220,10 +225,13 @@ const moveModifiedValidatedEntriesToUlPure = ({
 
 
 // Get all UL Pure entries
-const fetchUlPureEntries = () => {
-  const rows = db.prepare(`SELECT ${UL_COLUMNS} FROM UlpureData ORDER BY Id DESC`).all();
+const fetchUlPureEntries = async () => {
+  const rows = await db.all(
+    `SELECT ${UL_COLUMNS} FROM UlpureData ORDER BY Id DESC`
+  );
   return rows.map((row) => ({
     ...row,
+    RegonId: REGON_IDS[row.Site] || null,
     FormulaDescription:
       FORMULA_DESCRIPTIONS[row.FormulaCode] ||
       (row.DataSource === 'Manual' ? 'Manual entry value, used as-is (no calculation)' : '-'),
@@ -232,19 +240,17 @@ const fetchUlPureEntries = () => {
 
 
 // Get one entry
-const fetchUlPureEntryById = (id) => {
-  return db
-    .prepare(
-      `SELECT ${UL_COLUMNS} FROM UlpureData WHERE Id = ?`
-    )
-    .get(id);
+const fetchUlPureEntryById = async (id) => {
+  const row = await db.get(`SELECT ${UL_COLUMNS} FROM UlpureData WHERE Id = ?`, [id]);
+  if (row) row.RegonId = REGON_IDS[row.Site] || null;
+  return row;
 };
 
 
 
 // Save from UL Pure Details page
-const updateUlPureEntry = (id, data) => {
-  const entry = fetchUlPureEntryById(id);
+const updateUlPureEntry = async (id, data) => {
+  const entry = await fetchUlPureEntryById(id);
 
   if (!entry) {
     throw new Error('UL Pure entry not found');
@@ -259,7 +265,7 @@ const updateUlPureEntry = (id, data) => {
     Status: 'Validated',
   };
 
-  logFieldChanges({
+  await logFieldChanges({
     tableName: 'UlpureData',
     recordId: id,
     oldRecord: entry,
@@ -267,50 +273,49 @@ const updateUlPureEntry = (id, data) => {
     changedBy,
   });
 
-  db.prepare(`
-    UPDATE UlpureData
+  await db.run(
+    `UPDATE UlpureData
     SET
       PostingMonth = ?,
       Consumption = ?,
       Comment = ?,
       Status = ?,
       ModifiedBy = ?,
-      ModifiedAt = datetime('now')
-    WHERE Id = ?
-  `).run(
-    newValues.PostingMonth,
-    newValues.Consumption,
-    newValues.Comment,
-    newValues.Status,
-    changedBy,
-    id
+      ModifiedAt = GETDATE()
+    WHERE Id = ?`,
+    [
+      newValues.PostingMonth,
+      newValues.Consumption,
+      newValues.Comment,
+      newValues.Status,
+      changedBy,
+      id,
+    ]
   );
 
   return fetchUlPureEntryById(id);
 };
 
-const markUlPureReviewed = (id, reviewedBy) => {
-  const entry = db.prepare('SELECT Id FROM UlpureData WHERE Id = ?').get(id);
+const markUlPureReviewed = async (id, reviewedBy) => {
+  const entry = await db.get('SELECT Id FROM UlpureData WHERE Id = ?', [id]);
   if (!entry) throw new Error('UL Pure entry not found');
 
-  db.prepare(`
-    UPDATE UlpureData
+  await db.run(
+    `UPDATE UlpureData
     SET ReviewStatus = 'Reviewed',
         ReviewedBy = ?,
-        ReviewedAt = datetime('now')
-    WHERE Id = ?
-  `).run(reviewedBy || 'Unknown User', id);
+        ReviewedAt = GETDATE()
+    WHERE Id = ?`,
+    [reviewedBy || 'Unknown User', id]
+  );
 
   return fetchUlPureEntryById(id);
 };
 
 
 // Clear table (manual rows only; calculated rows are managed by the calc engine)
-const clearUlPureEntries = () => {
-
-  db.prepare(
-    "DELETE FROM UlpureData WHERE DataSource = 'Manual'"
-  ).run();
+const clearUlPureEntries = async () => {
+  await db.run("DELETE FROM UlpureData WHERE DataSource = 'Manual'");
 
   return {
     message: 'UL Pure table cleared successfully'
@@ -319,41 +324,70 @@ const clearUlPureEntries = () => {
 
 
 const RAW_COLUMNS = `
-  Id, ValueSlot, Consumption, PostingDateMonth, Units,
+  Id, ValueSlot, TemplateType, Consumption, PostingDateMonth, Units,
   AccountNumber, DataSource, InvoiceNo, PdfFile, ValidateUser, Status, Comments, CreatedAt
 `;
 
 // Raw GtoInvoices rows that fed a specific Calculated UlpureData entry —
 // current month, plus the previous month (needed for delta utilities like
 // Water/District Heating; harmless to include for the rest).
-const fetchRawDataForUlPureEntry = (id) => {
-  const entry = db
-    .prepare('SELECT SiteId, UtilityTypeId, PostingDateMonth, Utility FROM UlpureData WHERE Id = ?')
-    .get(id);
+const fetchRawDataForUlPureEntry = async (id) => {
+  const entry = await db.get(
+    'SELECT SiteId, UtilityTypeId, PostingDateMonth, Utility, FormulaCode FROM UlpureData WHERE Id = ?',
+    [id]
+  );
   if (!entry) {
     const err = new Error('UL Pure entry not found');
     err.status = 404;
     throw err;
   }
 
-  const rawStmt = db.prepare(`
+  const currentMonth = entry.PostingDateMonth;
+
+  // NRV (aggregate mode) rows have no UtilityTypeId/ValueSlot — they're a
+  // SUM(Consumption) over rows matching the formula's TemplateType filter, and
+  // don't need a previous month (no delta math), so only the current month applies.
+  if (entry.UtilityTypeId == null) {
+    const sumConfig = NRV_SUM_UTILITIES.find((s) => s.code === entry.FormulaCode);
+    const rows = sumConfig && currentMonth
+      ? await db.all(
+          `SELECT ${RAW_COLUMNS} FROM GtoInvoices
+          WHERE SiteId = ? AND PostingDateMonth = ? AND (${sumConfig.where})
+          ORDER BY Id`,
+          [entry.SiteId, currentMonth]
+        )
+      : [];
+
+    return {
+      utility: entry.Utility,
+      mode: 'aggregate',
+      currentMonth: { month: currentMonth, rows },
+      previousMonth: { month: null, rows: [] },
+    };
+  }
+
+  const rawQuery = `
     SELECT ${RAW_COLUMNS} FROM GtoInvoices
     WHERE SiteId = ? AND UtilityTypeId = ? AND PostingDateMonth = ?
     ORDER BY ValueSlot
-  `);
+  `;
 
-  const currentMonth = entry.PostingDateMonth;
   const previousMonth = currentMonth ? prevMonth(currentMonth) : null;
 
   return {
     utility: entry.Utility,
+    mode: 'slot',
     currentMonth: {
       month: currentMonth,
-      rows: currentMonth ? rawStmt.all(entry.SiteId, entry.UtilityTypeId, currentMonth) : [],
+      rows: currentMonth
+        ? await db.all(rawQuery, [entry.SiteId, entry.UtilityTypeId, currentMonth])
+        : [],
     },
     previousMonth: {
       month: previousMonth,
-      rows: previousMonth ? rawStmt.all(entry.SiteId, entry.UtilityTypeId, previousMonth) : [],
+      rows: previousMonth
+        ? await db.all(rawQuery, [entry.SiteId, entry.UtilityTypeId, previousMonth])
+        : [],
     },
   };
 };

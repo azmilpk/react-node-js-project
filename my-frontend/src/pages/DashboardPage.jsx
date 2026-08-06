@@ -375,7 +375,7 @@ function DashboardPage() {
                     href={previewFile.previewUrl}
                     target="_blank"
                     rel="noreferrer"
-                    className="h-[40px] px-5 rounded-full bg-black text-white text-[13px] font-semibold hover:bg-neutral-800 transition"
+                    className="h-[25px] px-5 rounded-full items-center bg-black text-white text-[13px] font-semibold hover:bg-neutral-800 transition"
                   >
                     Open File
                   </a>

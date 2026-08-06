@@ -3,6 +3,7 @@ import { useState } from 'react';
 import TopNavbar from '../components/topnavbar/TopNavbar';
 import HistoryPanel from '../components/HistoryPanel';
 import { API_BASE_URL, authFetch, getToken } from '../config/api';
+import { clearCache } from '../utils/pageCache';
 
 function ValidateDetailsPage() {
   const navigate = useNavigate();
@@ -104,6 +105,10 @@ const getAuthUser = () => {
       }
 
       alert('Entry updated successfully');
+
+      // The Validate page caches its table data; without clearing it here,
+      // navigating back would show the pre-save status instead of the update.
+      clearCache('validatePage_cache');
 
       navigate('/validate-data', {
         state: {

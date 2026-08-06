@@ -7,27 +7,27 @@ const {
   fetchRawDataForUlPureEntry,
 } = require('../services/ulPureService');
 
-const generateUlPureFromModified = (req, res, next) => {
+const generateUlPureFromModified = async (req, res, next) => {
   try {
-    const result = moveModifiedValidatedEntriesToUlPure(req.body || {});
+    const result = await moveModifiedValidatedEntriesToUlPure(req.body || {});
     res.json(result);
   } catch (error) {
     next(error);
   }
 };
 
-const getUlPureEntries = (req, res, next) => {
+const getUlPureEntries = async (req, res, next) => {
   try {
-    const result = fetchUlPureEntries();
+    const result = await fetchUlPureEntries();
     res.json(result);
   } catch (error) {
     next(error);
   }
 };
 
-const getUlPureEntryById = (req, res, next) => {
+const getUlPureEntryById = async (req, res, next) => {
   try {
-    const result = fetchUlPureEntryById(req.params.id);
+    const result = await fetchUlPureEntryById(req.params.id);
 
     if (!result) {
       return res.status(404).json({ message: 'UL Pure entry not found' });
@@ -39,27 +39,27 @@ const getUlPureEntryById = (req, res, next) => {
   }
 };
 
-const getRawDataForEntry = (req, res, next) => {
+const getRawDataForEntry = async (req, res, next) => {
   try {
-    const result = fetchRawDataForUlPureEntry(req.params.id);
+    const result = await fetchRawDataForUlPureEntry(req.params.id);
     res.json(result);
   } catch (error) {
     next(error);
   }
 };
 
-const reviewUlPureEntry = (req, res, next) => {
+const reviewUlPureEntry = async (req, res, next) => {
   try {
-    const result = markUlPureReviewed(req.params.id, req.body.reviewedBy);
+    const result = await markUlPureReviewed(req.params.id, req.body.reviewedBy);
     res.json(result);
   } catch (error) {
     next(error);
   }
 };
 
-const editUlPureEntry = (req, res, next) => {
+const editUlPureEntry = async (req, res, next) => {
   try {
-    const result = updateUlPureEntry(req.params.id, req.body);
+    const result = await updateUlPureEntry(req.params.id, req.body);
     res.json(result);
   } catch (error) {
     next(error);

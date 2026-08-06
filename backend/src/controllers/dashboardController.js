@@ -32,22 +32,21 @@ const getDashboardData = async (req, res, next) => {
     let sql = `
       SELECT
         g.Id,
-        g.AccountNumber,
+        g.Accountnumber AS AccountNumber,
         g.Consumption,
-        g.InvoiceDate,
-        g.PostingDateMonth,
-        g.BotStatus,
-        g.DataSource,
-        g.Facility,
-        g.Units,
+        g.Invoicedate AS InvoiceDate,
+        g.Postingdatemonth AS PostingDateMonth,
+        g.Botstatus AS BotStatus,
+        g.Datasource AS DataSource,
+        g.facility AS Facility,
+        g.units AS Units,
         g.PdfFile,
-        g.InvoiceNo,
-        g.CreatedAt,
+        NULL AS InvoiceNo,
+        g.createddate AS CreatedAt,
         s.SiteName,
-        u.UtilityName
-      FROM GtoInvoices g
+        g.Templatetype AS UtilityName
+      FROM Gto_Invoices g
       LEFT JOIN Sites s ON s.Id = g.SiteId
-      LEFT JOIN UtilityTypes u ON u.Id = g.UtilityTypeId
       WHERE 1=1
     `;
 
@@ -57,26 +56,23 @@ const getDashboardData = async (req, res, next) => {
       sql += ' AND g.SiteId = ?';
       params.push(siteId);
     }
-    if (utilityTypeId) {
-      sql += ' AND g.UtilityTypeId = ?';
-      params.push(utilityTypeId);
-    }
+    // Utility filter omitted: Gto_Invoices has no utility column yet.
     if (month) {
-      sql += ' AND substr(g.PostingDateMonth, 6, 2) = ?';
+      sql += ' AND SUBSTRING(g.Postingdatemonth, 6, 2) = ?';
       params.push(month);
     }
     if (year) {
-      sql += ' AND substr(g.PostingDateMonth, 1, 4) = ?';
+      sql += ' AND SUBSTRING(g.Postingdatemonth, 1, 4) = ?';
       params.push(year);
     }
     if (botStatus) {
-      sql += ' AND g.BotStatus = ?';
+      sql += ' AND g.Botstatus = ?';
       params.push(botStatus);
     }
 
-    sql += ' ORDER BY g.CreatedAt DESC';
+    sql += ' ORDER BY g.createddate DESC';
 
-    const rows = db.prepare(sql).all(...params);
+    const rows = await db.all(sql, params);
 
     // Reach the blob container once; if unavailable (e.g. local dev without Azure
     // creds) fall back to "URL present" so the dashboard still works.
@@ -111,18 +107,18 @@ const getDashboardData = async (req, res, next) => {
   }
 };
 
-const getDashboardSites = (req, res, next) => {
+const getDashboardSites = async (req, res, next) => {
   try {
-    const rows = db.prepare('SELECT Id, SiteName FROM Sites ORDER BY SiteName').all();
+    const rows = await db.all('SELECT Id, SiteName FROM Sites ORDER BY SiteName');
     res.json(rows);
   } catch (error) {
     next(error);
   }
 };
 
-const getDashboardUtilities = (req, res, next) => {
+const getDashboardUtilities = async (req, res, next) => {
   try {
-    const rows = db.prepare('SELECT Id, UtilityName FROM UtilityTypes ORDER BY UtilityName').all();
+    const rows = await db.all('SELECT UtilityTypeID AS Id, UtilityName FROM UtilityTypes ORDER BY UtilityName');
     res.json(rows);
   } catch (error) {
     next(error);

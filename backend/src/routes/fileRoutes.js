@@ -10,6 +10,10 @@ const ALLOWED_MIME = new Set([
   'image/png',
   'image/gif',
   'image/webp',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', // .xlsx
+  'application/vnd.ms-excel', // .xls
+  'text/csv', // .csv
+  'application/octet-stream', // some browsers send this for .xls/.csv
 ]);
 
 const upload = multer({
