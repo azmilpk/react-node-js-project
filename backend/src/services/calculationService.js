@@ -9,13 +9,16 @@ function prevMonth(ym) {
   return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`;
 }
 
-const num = (v) => (typeof v === 'number' && !Number.isNaN(v) ? v : 0);
+const num = (v) => {
+  const n = typeof v === 'number' ? v : parseFloat(v);
+  return Number.isFinite(n) ? n : 0;
+};
 
 // Build { V1: number, V2: number, ... } for one site/utility/month
 async function slotMap(t, siteId, utilityTypeId, month) {
   const rows = await t.all(
     `SELECT ValueSlot, Consumption
-    FROM GtoInvoices
+    FROM Gto_Invoices
     WHERE SiteId = ? AND UtilityTypeId = ? AND PostingDateMonth = ?`,
     [siteId, utilityTypeId, month]
   );
@@ -363,7 +366,7 @@ const SITE_CONFIG = {
 // Manual form entries land as DIRECT rows: a single, already-final value that
 // is echoed straight through instead of being run through a meter formula.
 const DIRECT_SQL = `
-  SELECT TOP 1 SourceEntryId, Consumption, Units FROM GtoInvoices
+  SELECT TOP 1 SourceEntryId, Consumption, Units FROM Gto_Invoices
   WHERE SiteId = ? AND UtilityTypeId = ? AND PostingDateMonth = ? AND FormulaCode = 'DIRECT'
   ORDER BY Id DESC
 `;
@@ -371,7 +374,7 @@ const DIRECT_SQL = `
 // A form entry promoted via the "Generate UL Pure" button already exists in
 // UlpureData as a Manual row; the calc engine must not create a duplicate.
 const MANUAL_EXISTS_SQL = `
-  SELECT TOP 1 1 AS ok FROM UlpureData
+  SELECT TOP 1 1 AS ok FROM tbl_ulpure_data
   WHERE SourceEntryId = ? AND DataSource = 'Manual'
 `;
 
@@ -379,27 +382,27 @@ const MANUAL_EXISTS_SQL = `
 // row keeps its Id — and therefore its audit history — instead of being deleted
 // and re-inserted with a fresh Id every run.
 const FIND_CALC_SQL = `
-  SELECT TOP 1 Id, Consumption, ReviewStatus, UlpureStatus FROM UlpureData
+  SELECT TOP 1 Id, Consumption, ReviewStatus, ulpure_status AS UlpureStatus FROM tbl_ulpure_data
   WHERE SiteId = ? AND UtilityTypeId = ? AND PostingDateMonth = ? AND DataSource = 'Calculated' AND FormulaCode = ?
 `;
 
 const INSERT_CALC_SQL = `
-  INSERT INTO UlpureData
+  INSERT INTO tbl_ulpure_data
     (PostingDateMonth, UtilityTypeId, SiteId, Utility, Site,
-     Consumption, PreviousConsumptionUL, Units, UlpureStatus, FormulaCode, IndicatorName, IndicatorId, DataSource)
+     Consumption, PreviousConsumptionUL, Units, ulpure_status, FormulaCode, [Indicator Name], [Indicator ID], DataSource)
   VALUES (@month, @utilityTypeId, @siteId, @utility, @site,
           @value, @previous, @units, 'Validate', @code, @indicator, @indicatorId, 'Calculated')
 `;
 
 const UPDATE_CALC_SQL = `
-  UPDATE UlpureData
+  UPDATE tbl_ulpure_data
   SET Utility = @utility, Site = @site, Consumption = @value,
-      Units = @units, FormulaCode = @code, IndicatorName = @indicator, IndicatorId = @indicatorId
+      Units = @units, FormulaCode = @code, [Indicator Name] = @indicator, [Indicator ID] = @indicatorId
   WHERE Id = @id
 `;
 
 const AGG_FIND_SQL = `
-  SELECT TOP 1 Id, Consumption, ReviewStatus, UlpureStatus FROM UlpureData
+  SELECT TOP 1 Id, Consumption, ReviewStatus, ulpure_status AS UlpureStatus FROM tbl_ulpure_data
   WHERE SiteId = ? AND Utility = ? AND PostingDateMonth = ? AND DataSource = 'Calculated'
 `;
 
@@ -416,9 +419,9 @@ async function calculateAll({ site } = {}) {
   const combos = await db.all(
     `SELECT DISTINCT g.SiteId, g.UtilityTypeId, g.PostingDateMonth,
            s.SiteName, u.UtilityName
-    FROM GtoInvoices g
+    FROM Gto_Invoices g
     JOIN Sites s ON s.Id = g.SiteId
-    JOIN UtilityTypes u ON u.Id = g.UtilityTypeId
+    JOIN UtilityTypes u ON u.UtilityTypeID = g.UtilityTypeId
     WHERE g.PostingDateMonth IS NOT NULL
       ${siteId ? 'AND g.SiteId = ?' : ''}
     ORDER BY g.PostingDateMonth, s.SiteName, u.UtilityName`,
@@ -642,7 +645,7 @@ async function calculateAll({ site } = {}) {
 
       const aggMonths = (
         await t.all(
-          "SELECT DISTINCT PostingDateMonth AS m FROM GtoInvoices WHERE SiteId = ? AND PostingDateMonth IS NOT NULL",
+          "SELECT DISTINCT PostingDateMonth AS m FROM Gto_Invoices WHERE SiteId = ? AND PostingDateMonth IS NOT NULL",
           [aggSite.Id]
         )
       ).map((r) => r.m);
@@ -684,7 +687,7 @@ async function calculateAll({ site } = {}) {
           // Hitl has been retired: every source row for the month is summed.
           const row = await t.get(
             `SELECT COALESCE(SUM(CAST(Consumption AS FLOAT)), 0) AS total
-             FROM GtoInvoices
+             FROM Gto_Invoices
              WHERE SiteId = @siteId AND PostingDateMonth = @month AND (${s.where})`,
             { siteId: aggSite.Id, month }
           );
@@ -709,20 +712,20 @@ async function calculateAll({ site } = {}) {
     if (keptIds.length > 0) {
       const placeholders = keptIds.map(() => '?').join(',');
       await t.run(
-        `DELETE FROM UlpureData
+        `DELETE FROM tbl_ulpure_data
          WHERE DataSource = 'Calculated'
            AND Id NOT IN (${placeholders})
            AND ReviewStatus != 'Reviewed'
-           AND UlpureStatus != 'Validated'
+           AND ulpure_status != 'Validated'
            ${siteClause}`,
         [...keptIds, ...siteArg]
       );
     } else {
       await t.run(
-        `DELETE FROM UlpureData
+        `DELETE FROM tbl_ulpure_data
          WHERE DataSource = 'Calculated'
            AND ReviewStatus != 'Reviewed'
-           AND UlpureStatus != 'Validated'
+           AND ulpure_status != 'Validated'
            ${siteClause}`,
         siteArg
       );

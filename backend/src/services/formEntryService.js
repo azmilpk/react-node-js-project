@@ -94,7 +94,7 @@ const ENTRY_COLUMNS = `
   g.Id AS Id,
   s.SiteName AS SiteCode,
   s.SiteName AS Site,
-  g.facility AS FacilityCode,
+  CASE WHEN g.site = 'NRV' THEN g.site ELSE g.facility END AS FacilityCode,
   g.Templatetype AS UtilityName,
   g.Postingdatemonth AS PostingMonth,
   g.Accountnumber AS AccountMeterNo,
@@ -103,7 +103,7 @@ const ENTRY_COLUMNS = `
   NULL AS PreviousConsumption,
   g.Invoicedate AS InvoiceDate,
   NULL AS InvoiceNo,
-  COALESCE(g.Status, 'Pending') AS Status,
+  COALESCE(g.Hitl, 'Pending') AS Status,
   g.Botstatus AS BotStatus,
   g.Validateuser AS ValidateUser,
   g.validatorLoginTime AS ValidatorLoginTime,
@@ -179,7 +179,7 @@ const insertFormEntry = async (data) => {
         AccountNumber = @accountNumber,
         Units = @units,
         Consumption = @consumption,
-        Status = @status,
+        Hitl = @status,
         PdfFile = @pdfFile,
         Comments = @comment,
         InvoiceDate = @invoiceDate,
@@ -209,7 +209,7 @@ const insertFormEntry = async (data) => {
         AccountNumber,
         Units,
         Consumption,
-        Status,
+        Hitl,
         CreatedBy,
         PdfFile,
         Comments,
@@ -268,7 +268,7 @@ const fetchFormEntries = async (query) => {
   const params = [];
 
   if (query.facilityCode) {
-    sql += ' AND g.site = ?';
+    sql += ' AND s.Facility = ?';
     params.push(query.facilityCode);
   }
 
@@ -278,7 +278,7 @@ const fetchFormEntries = async (query) => {
   }
 
   if (query.status) {
-    sql += " AND COALESCE(g.Status, 'Pending') = ?";
+    sql += " AND COALESCE(g.Hitl, 'Pending') = ?";
     params.push(query.status);
   }
 
@@ -296,7 +296,7 @@ const changeFormEntryStatus = async (id, status, changedBy) => {
   if (!entry) throw new Error('Entry not found');
 
   let finalStatus = status;
-  if (status === 'Validated' && entry.Status === 'Modified') {
+  if (status === 'Validated' && entry.Hitl === 'Modified') {
     finalStatus = 'Modified and Validated';
   }
 
@@ -304,12 +304,12 @@ const changeFormEntryStatus = async (id, status, changedBy) => {
     tableName: 'GtoInvoices',
     recordId: id,
     oldRecord: entry,
-    newFields: { Status: finalStatus },
+    newFields: { Hitl: finalStatus },
     changedBy: changedBy || 'Unknown User',
   });
 
   await db.run(
-    "UPDATE Gto_Invoices SET Status = ?, ModifiedBy = ?, ModifiedAt = GETDATE() WHERE Id = ?",
+    "UPDATE Gto_Invoices SET Hitl = ?, ModifiedBy = ?, ModifiedAt = GETDATE() WHERE Id = ?",
     [finalStatus, changedBy || 'Unknown User', id]
   );
   return selectEntryById(id);
@@ -326,7 +326,7 @@ const updateFormEntry = async (id, data) => {
   const changedBy = data.changedBy || data.modifiedBy || 'Unknown User';
 
   const alreadyValidated =
-    entry.Status === 'Validated' || entry.Status === 'Modified and Validated';
+    entry.Hitl === 'Validated' || entry.Hitl === 'Modified and Validated';
 
   const nextValues = {
     PostingDateMonth: data.postingMonth || entry.PostingDateMonth,
@@ -342,14 +342,14 @@ const updateFormEntry = async (id, data) => {
   let nextStatus;
   if (alreadyValidated) {
     // Only downgrade to "Modified and Validated" when something actually changed.
-    nextStatus = hasChanges ? 'Modified and Validated' : entry.Status;
+    nextStatus = hasChanges ? 'Modified and Validated' : entry.Hitl;
   } else {
     nextStatus = 'Validated';
   }
 
   const newValues = {
     ...nextValues,
-    Status: nextStatus,
+    Hitl: nextStatus,
   };
 
   await logFieldChanges({
@@ -366,7 +366,7 @@ const updateFormEntry = async (id, data) => {
       PostingDateMonth = ?,
       Consumption = ?,
       Comments = ?,
-      Status = ?,
+      Hitl = ?,
       ModifiedBy = ?,
       ModifiedAt = GETDATE()
     WHERE Id = ?`,
@@ -374,7 +374,7 @@ const updateFormEntry = async (id, data) => {
       newValues.PostingDateMonth,
       newValues.Consumption,
       newValues.Comments,
-      newValues.Status,
+      newValues.Hitl,
       changedBy,
       id,
     ]

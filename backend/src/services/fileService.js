@@ -77,9 +77,9 @@ const streamBlobToResponse = async (blobUrl, res) => {
   // cannot enumerate/read arbitrary blobs in the container.
   const referenced = await db.get(
     `SELECT TOP 1 1 AS ok FROM (
-       SELECT 1 AS ok FROM GtoInvoices WHERE PdfFile = ?
+       SELECT 1 AS ok FROM Gto_Invoices WHERE PdfFile = ?
        UNION
-       SELECT 1 AS ok FROM UlpureData WHERE FileUrl = ?
+       SELECT 1 AS ok FROM tbl_ulpure_data WHERE FileUrl = ?
      ) refs`,
     [blobUrl, blobUrl]
   );

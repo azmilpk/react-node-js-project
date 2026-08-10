@@ -38,7 +38,7 @@ const logFieldChanges = async ({ tableName, recordId, oldRecord, newFields, chan
 };
 const fetchCombinedUlPureHistory = async (ulPureId) => {
   const entry = await db.get(
-    'SELECT SourceEntryId FROM UlpureData WHERE Id = ?',
+    'SELECT SourceEntryId FROM tbl_ulpure_data WHERE Id = ?',
     [ulPureId]
   );
 

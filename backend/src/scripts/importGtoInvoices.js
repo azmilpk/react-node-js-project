@@ -6,9 +6,9 @@
  *   node src/scripts/importGtoInvoices.js "C:/Users/A500399/Downloads/JOPINGData_Bacup.xlsx"
  */
 
+require('dotenv').config();
 const XLSX = require('xlsx');
 const db = require('../config/db');
-require('dotenv').config();
 
 // ─── EDITABLE MAPPINGS ───────────────────────────────────────────────────────
 
@@ -142,28 +142,32 @@ const toNum = (v) => {
   return Number.isFinite(n) ? n : null;
 };
 
-const toISODate = (v) =>
-  v instanceof Date && !Number.isNaN(v.getTime())
-    ? v.toISOString().slice(0, 10)
-    : v ? String(v) : null;
+const toISODate = (v) => {
+  if (v instanceof Date && !Number.isNaN(v.getTime())) return v.toISOString().slice(0, 10);
+  if (v === '' || v === null || v === undefined) return null;
+  const d = new Date(v);
+  return Number.isNaN(d.getTime()) ? null : d.toISOString().slice(0, 10);
+};
 
-const toISOTime = (v) =>
-  v instanceof Date && !Number.isNaN(v.getTime())
-    ? v.toISOString().slice(11, 19)
-    : v ? String(v) : null;
+const toISOTime = (v) => {
+  if (v instanceof Date && !Number.isNaN(v.getTime())) return v.toISOString().slice(11, 19);
+  if (v === '' || v === null || v === undefined) return null;
+  const d = new Date(v);
+  return Number.isNaN(d.getTime()) ? null : d.toISOString().slice(11, 19);
+};
 
 const INSERT_SQL = `
-  INSERT INTO GtoInvoices (
+  INSERT INTO Gto_Invoices (
     AccountNumber, ValueSlot, Consumption, PreviousConsumption,
     FreshWaterStaticValue, EvaporationFactorValue, ConstantValue,
     InvoiceDate, PostingDateMonth, BotStatus, DataSource,
-    UtilityTypeId, SiteId, TemplateType, Facility, Units, FormulaCode,
+    UtilityTypeId, SiteId, Site, TemplateType, Facility, Units, FormulaCode,
     PdfFile, InvoiceNo, ValidateUser, Approver, Comments, ValidatorLoginTime
   ) VALUES (
     @accountNumber, @valueSlot, @consumption, @previousConsumption,
     @freshWater, @evaporation, @constantValue,
     @invoiceDate, @postingDateMonth, @botStatus, @dataSource,
-    @utilityTypeId, @siteId, @templateType, @facility, @units, @formulaCode,
+    @utilityTypeId, @siteId, @site, @templateType, @facility, @units, @formulaCode,
     @pdfFile, @invoiceNo, @validateUser, @approver, @comments, @validatorLoginTime
   )`;
 
@@ -231,7 +235,8 @@ async function main() {
     botStatus: r.Botstatus || null,
     dataSource: r.Datasource || 'Bot',
     utilityTypeId: utilityIdByName.get(utilityName) || null,
-    siteId: siteIdByName.get(site) || null,
+    siteId: siteIdByName.get(site) || siteIdByName.get(r.facility) || null,
+    site: site || null,
     templateType: templateType || null,
     facility: r.facility || null,
     units: r.units || null,
@@ -251,12 +256,12 @@ async function main() {
     const siteIds = new Set();
     for (const m of mapped) if (m.siteId) siteIds.add(m.siteId);
     for (const id of siteIds) {
-      await t.run('DELETE FROM GtoInvoices WHERE SiteId = ?', [id]);
+      await t.run('DELETE FROM Gto_Invoices WHERE SiteId = ?', [id]);
     }
     for (const m of mapped) await t.run(INSERT_SQL, m);
   });
 
-  console.log(`Imported ${rows.length} rows into GtoInvoices.`);
+  console.log(`Imported ${rows.length} rows into Gto_Invoices.`);
 
   if (unmappedAccounts.size > 0) {
     console.log(`\nWARNING: ${unmappedAccounts.size} account(s) have no ValueSlot (imported as NULL). Add them to ACCOUNT_VALUE_SLOT:`);
