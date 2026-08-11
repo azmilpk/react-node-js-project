@@ -1,13 +1,16 @@
 import { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { useMsal } from '@azure/msal-react';
 import TopNavbar from '../components/topnavbar/TopNavbar';
 import loginBg from '../assets/images/login1.jpg';
 import showIcon from '../assets/images/show.svg';
 import { API_BASE_URL } from '../config/api';
+import { loginRequest } from '../config/authConfig';
 
 function LoginPage() {
   const navigate = useNavigate();
   const location = useLocation();
+  const { instance } = useMsal();
 
   const selectedRole = location.state?.role || '';
 
@@ -15,6 +18,39 @@ function LoginPage() {
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+
+  // Shared by both password login and Entra ID login: applies the role check,
+  // stores the session, and redirects. `user` is the backend's login response.
+  const applyLoggedInUser = (user) => {
+    const actualRole = user.Role || user.role || '';
+    const expectedRole = selectedRole || '';
+
+    if (expectedRole && actualRole !== expectedRole) {
+      alert(`This login is only for ${expectedRole}.`);
+      return;
+    }
+
+    localStorage.setItem(
+      'authUser',
+      JSON.stringify({
+        name: user.Name || user.name,
+        userId: user.UserId || user.userId || user.id,
+        role: actualRole,
+      })
+    );
+
+    if (user.token) {
+      localStorage.setItem('authToken', user.token);
+    }
+
+    if (actualRole === 'Auditor') {
+      navigate('/auditor-ul-pure');
+    } else if (actualRole === 'SiteOwner') {
+      navigate('/site-owner');
+    } else {
+      alert('Invalid role');
+    }
+  };
 
   const handleLogin = async () => {
     try {
@@ -35,34 +71,7 @@ function LoginPage() {
         return;
       }
 
-      const actualRole = user.Role || user.role || '';
-      const expectedRole = selectedRole || '';
-
-      if (expectedRole && actualRole !== expectedRole) {
-        alert(`This login is only for ${expectedRole}.`);
-        return;
-      }
-
-      localStorage.setItem(
-        'authUser',
-        JSON.stringify({
-          name: user.Name || user.name,
-          userId: user.UserId || user.userId || user.id,
-          role: actualRole,
-        })
-      );
-
-      if (user.token) {
-        localStorage.setItem('authToken', user.token);
-      }
-
-      if (actualRole === 'Auditor') {
-        navigate('/auditor-ul-pure');
-      } else if (actualRole === 'SiteOwner') {
-        navigate('/site-owner');
-      } else {
-        alert('Invalid role');
-      }
+      applyLoggedInUser(user);
     } catch (error) {
       console.error(error);
       alert('Login failed');
@@ -70,6 +79,44 @@ function LoginPage() {
       setIsLoading(false);
     }
   };
+
+  const handleEntraLogin = async () => {
+    if (!selectedRole) {
+      alert('Please go back and choose Auditor or Site Owner before signing in with Microsoft.');
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+
+      const result = await instance.loginPopup(loginRequest);
+
+      const response = await fetch(`${API_BASE_URL}/api/auth/entra-login`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ idToken: result.idToken, role: selectedRole }),
+      });
+
+      const user = await response.json();
+
+      if (!response.ok) {
+        alert(user.message || 'Microsoft sign-in failed');
+        return;
+      }
+
+      applyLoggedInUser(user);
+    } catch (error) {
+      console.error(error);
+      if (error.errorCode !== 'user_cancelled') {
+        alert('Microsoft sign-in failed');
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
 
   return (
     <div
@@ -150,6 +197,21 @@ function LoginPage() {
               className="w-full h-10 rounded-full bg-black text-white text-sm font-semibold hover:opacity-80 transition-all duration-300 disabled:opacity-60"
             >
               {isLoading ? 'Logging in...' : 'Login'}
+            </button>
+
+            <div className="w-full flex items-center gap-3 text-white/60 text-[11px]">
+              <div className="flex-1 h-px bg-white/30" />
+              or
+              <div className="flex-1 h-px bg-white/30" />
+            </div>
+
+            <button
+              type="button"
+              onClick={handleEntraLogin}
+              disabled={isLoading}
+              className="w-full h-10 rounded-full bg-white text-black text-sm font-semibold hover:opacity-80 transition-all duration-300 disabled:opacity-60 flex items-center justify-center gap-2"
+            >
+              Sign in with Microsoft
             </button>
 
             <button

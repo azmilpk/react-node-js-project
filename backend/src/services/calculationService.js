@@ -19,7 +19,8 @@ async function slotMap(t, siteId, utilityTypeId, month) {
   const rows = await t.all(
     `SELECT ValueSlot, Consumption
     FROM Gto_Invoices
-    WHERE SiteId = ? AND UtilityTypeId = ? AND PostingDateMonth = ?`,
+    WHERE SiteId = ? AND UtilityTypeId = ? AND PostingDateMonth = ?
+      AND Hitl IN ('Validated', 'Modified and Validated')`,
     [siteId, utilityTypeId, month]
   );
   const map = {};
@@ -645,7 +646,7 @@ async function calculateAll({ site } = {}) {
 
       const aggMonths = (
         await t.all(
-          "SELECT DISTINCT PostingDateMonth AS m FROM Gto_Invoices WHERE SiteId = ? AND PostingDateMonth IS NOT NULL",
+          "SELECT DISTINCT PostingDateMonth AS m FROM Gto_Invoices WHERE SiteId = ? AND PostingDateMonth IS NOT NULL AND Hitl IN ('Validated', 'Modified and Validated')",
           [aggSite.Id]
         )
       ).map((r) => r.m);
@@ -688,7 +689,9 @@ async function calculateAll({ site } = {}) {
           const row = await t.get(
             `SELECT COALESCE(SUM(CAST(Consumption AS FLOAT)), 0) AS total
              FROM Gto_Invoices
-             WHERE SiteId = @siteId AND PostingDateMonth = @month AND (${s.where})`,
+             WHERE SiteId = @siteId AND PostingDateMonth = @month
+               AND Hitl IN ('Validated', 'Modified and Validated')
+               AND (${s.where})`,
             { siteId: aggSite.Id, month }
           );
           let value = (row && row.total) || 0;

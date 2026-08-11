@@ -177,19 +177,34 @@ const moveModifiedValidatedEntriesToUlPure = async ({
     throw err;
   }
 
-  // Rule 1: every row must be validated. If any row is Pending (or otherwise
-  // not validated) the whole operation is blocked — no partial calculation.
-  const blocking = allEntries.filter((e) => !ALLOWED_STATUSES.includes(e.Status));
-  if (blocking.length > 0) {
-    const pendingCount = blocking.filter((e) => e.Status === 'Pending').length;
-    const err = new Error(
-      `Cannot generate UL Pure: ${blocking.length} ` +
-        `${blocking.length === 1 ? 'entry is' : 'entries are'} not validated` +
-        `${pendingCount ? ` (${pendingCount} Pending)` : ''}. ` +
-        `All entries must be "Validated" or "Modified and Validated" before generating.`
-    );
-    err.status = 400;
-    throw err;
+  // Köping needs COMPLETE data — its delta indicators (Water, District Heating)
+  // compare against the previous month, so every row must be validated. Other
+  // sites (NRV, US subsites) are pass-through / aggregation and can generate
+  // from whatever is validated: they only require at least one validated entry;
+  // pending rows are simply not blocked.
+  if (site === 'Köping') {
+    const blocking = allEntries.filter((e) => !ALLOWED_STATUSES.includes(e.Status));
+    if (blocking.length > 0) {
+      const pendingCount = blocking.filter((e) => e.Status === 'Pending').length;
+      const err = new Error(
+        `Cannot generate UL Pure: ${blocking.length} ` +
+          `${blocking.length === 1 ? 'entry is' : 'entries are'} not validated` +
+          `${pendingCount ? ` (${pendingCount} Pending)` : ''}. ` +
+          `All entries must be "Validated" or "Modified and Validated" before generating.`
+      );
+      err.status = 400;
+      throw err;
+    }
+  } else {
+    const validatedCount = allEntries.filter((e) => ALLOWED_STATUSES.includes(e.Status)).length;
+    if (validatedCount === 0) {
+      const err = new Error(
+        `Cannot generate UL Pure${site ? ` for "${site}"` : ''}: no validated entries. ` +
+          `Validate at least one month before generating.`
+      );
+      err.status = 400;
+      throw err;
+    }
   }
 
   // Rule 2: Köping's delta indicators (Water, District Heating) need a
