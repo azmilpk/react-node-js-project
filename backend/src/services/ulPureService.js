@@ -4,8 +4,9 @@ const { logFieldChanges } = require('./auditService');
 const { calculateAll, prevMonth, FORMULA_DESCRIPTIONS, NRV_SUM_UTILITIES } = require('./calculationService');
 
 // Aliased column list mapping the real tbl_ulpure_data columns to the field
-// names the UL Pure controllers / frontend expect. Columns the source table
-// does not have are surfaced as NULL.
+// names the UL Pure controllers / frontend expect. Columns confirmed absent
+// from the live table (verified via INFORMATION_SCHEMA) are surfaced as NULL;
+// FormulaCode/DataSource/PreviousConsumptionUL ARE real and must not be nulled.
 const UL_COLUMNS = `
   id AS Id,
   SourceEntryId,
@@ -21,7 +22,7 @@ const UL_COLUMNS = `
   NULL AS AccountMeterNo,
   units AS Units,
   consumption AS Consumption,
-  NULL AS PreviousConsumptionUL,
+  PreviousConsumptionUL,
   ulpure_status AS Status,
   Comments AS Comment,
   NULL AS FileName,
@@ -33,10 +34,10 @@ const UL_COLUMNS = `
   ReviewStatus,
   ReviewedBy,
   ReviewedAt,
-  NULL AS FormulaCode,
+  FormulaCode,
   [Indicator Name] AS IndicatorName,
   [Indicator ID] AS IndicatorId,
-  NULL AS DataSource
+  DataSource
 `;
 
 // Resolve normalized FK ids from free-text names (null-tolerant).
