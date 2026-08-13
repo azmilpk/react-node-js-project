@@ -193,6 +193,10 @@ async function main() {
   const templateType = r.Templatetype || '';
   const account = r.Accountnumber || '';
   const site = r.site || '';
+  const facility = r.facility || '';
+  // The Excel `site` column holds the parent group (e.g. 'LVO'), not the leaf
+  // US site — the actual site name (RT100/MEC/Macungie/LVLC) is in `facility`.
+  const usSite = US_SITES.has(site) ? site : US_SITES.has(facility) ? facility : null;
 
   // US sites resolve the utility from the account number (or a template-type
   // fallback) and are always pass-through into V1. Köping keeps the classic
@@ -201,9 +205,9 @@ async function main() {
   let valueSlot = ACCOUNT_VALUE_SLOT[account] || null;
   let formulaCode = TEMPLATE_FORMULA[templateType] || null;
 
-  if (US_SITES.has(site)) {
+  if (usSite) {
     const mapped =
-      SITE_ACCOUNT_UTILITY[site]?.[account] ||
+      SITE_ACCOUNT_UTILITY[usSite]?.[account] ||
       US_TEMPLATE_UTILITY[String(templateType).toLowerCase()] ||
       null;
     if (mapped) {
@@ -214,7 +218,7 @@ async function main() {
       valueSlot = account || 'V1';
       formulaCode = 'SITE_FORMULA'; // engine resolves math by `${site}|${utility}`
     } else if (account) {
-      unmappedAccounts.add(`[${site}] ${account}`);
+      unmappedAccounts.add(`[${usSite}] ${account}`);
     }
   } else if (site === 'Köping' && !valueSlot && account) {
     // Only Köping uses account->slot mapping; other sites (e.g. NRV) keep their
@@ -225,11 +229,14 @@ async function main() {
   return {
     accountNumber: account || null,
     valueSlot,
-    consumption: toNum(r.Consumption),
+    // Bind as strings: these are varchar columns, and mssql's automatic type
+    // inference for unstyled JS numbers can silently truncate precision
+    // (e.g. 11999.89 -> 11999.9) during the implicit conversion to text.
+    consumption: toNum(r.Consumption) !== null ? String(Math.round(toNum(r.Consumption) * 1000) / 1000) : null,
     previousConsumption: toNum(r.PreviousConsumption),
-    freshWater: toNum(r.FreshWaterStaticValue),
-    evaporation: toNum(r.EvaporationFactorValue),
-    constantValue: toNum(r.ConstantValue),
+    freshWater: toNum(r.FreshWaterStaticValue) !== null ? String(toNum(r.FreshWaterStaticValue)) : null,
+    evaporation: toNum(r.EvaporationFactorValue) !== null ? String(toNum(r.EvaporationFactorValue)) : null,
+    constantValue: toNum(r.ConstantValue) !== null ? String(toNum(r.ConstantValue)) : null,
     invoiceDate: toISODate(r.Invoicedate),
     postingDateMonth: r.Postingdatemonth || null,
     botStatus: r.Botstatus || null,

@@ -24,7 +24,10 @@ async function slotMap(t, siteId, utilityTypeId, month) {
     [siteId, utilityTypeId, month]
   );
   const map = {};
-  for (const r of rows) map[r.ValueSlot] = r.Consumption ?? 0;
+  // Accumulate rather than overwrite: two rows can legitimately share a slot
+  // (e.g. two invoices for the same meter in a month, or unmapped US rows that
+  // both landed on a NULL slot) — dropping one would silently under-count.
+  for (const r of rows) map[r.ValueSlot] = (map[r.ValueSlot] || 0) + num(r.Consumption);
   return map;
 }
 
@@ -434,6 +437,23 @@ async function calculateAll({ site } = {}) {
   const utilityTypeRows = await db.all('SELECT UtilityTypeID AS Id, UtilityName FROM UtilityTypes');
   const utilityTypeByName = new Map(utilityTypeRows.map((r) => [r.UtilityName, r]));
 
+  // A site+month must be 100% validated to calculate — one Pending row anywhere
+  // in that month excludes the whole month (no partial/incomplete sums), for
+  // every site (Köping, NRV, and the US slot sites alike).
+  const incompleteRows = await db.all(
+    `SELECT DISTINCT SiteId, PostingDateMonth AS month
+     FROM Gto_Invoices
+     WHERE PostingDateMonth IS NOT NULL AND COALESCE(Hitl, 'Pending') NOT IN ('Validated', 'Modified and Validated')
+       ${siteId ? 'AND SiteId = ?' : ''}`,
+    siteId ? [siteId] : []
+  );
+  const incompleteMonthsBySite = new Map(); // SiteId -> Set(month)
+  for (const r of incompleteRows) {
+    if (!incompleteMonthsBySite.has(r.SiteId)) incompleteMonthsBySite.set(r.SiteId, new Set());
+    incompleteMonthsBySite.get(r.SiteId).add(r.month);
+  }
+  const isMonthComplete = (sId, month) => !incompleteMonthsBySite.get(sId)?.has(month);
+
   await db.transaction(async (t) => {
     const keptIds = [];
     // Track which site+month combos produced output so we can guarantee a
@@ -447,6 +467,10 @@ async function calculateAll({ site } = {}) {
       // Utilities produced by the guaranteed-row pass (e.g. Köping Diesel) are
       // emitted after this loop, so skip them here.
       if (cfg.guaranteedRows && cfg.guaranteedRows.some((g) => g.utility === c.UtilityName)) continue;
+      if (!isMonthComplete(c.SiteId, c.PostingDateMonth)) {
+        results.push({ ...c, skipped: true, reason: 'month has pending rows' });
+        continue;
+      }
 
       const cur = await slotMap(t, c.SiteId, c.UtilityTypeId, c.PostingDateMonth);
       const prev = await slotMap(t, c.SiteId, c.UtilityTypeId, prevMonth(c.PostingDateMonth));
@@ -540,7 +564,7 @@ async function calculateAll({ site } = {}) {
             id: existing.Id,
             utility: o.utility || c.UtilityName,
             site: c.SiteName,
-            value,
+            value: String(value),
             units,
             code: o.code,
             indicator: indicatorName,
@@ -554,7 +578,7 @@ async function calculateAll({ site } = {}) {
             siteId: c.SiteId,
             utility: o.utility || c.UtilityName,
             site: c.SiteName,
-            value,
+            value: String(value),
             previous: null,
             units,
             code: o.code,
@@ -587,7 +611,7 @@ async function calculateAll({ site } = {}) {
           if (sName === siteName) targets.set(key, sName);
         }
         for (const c of combos) {
-          if (c.SiteName === siteName && c.UtilityName === g.utility) {
+          if (c.SiteName === siteName && c.UtilityName === g.utility && isMonthComplete(c.SiteId, c.PostingDateMonth)) {
             targets.set(`${c.SiteId}|${c.PostingDateMonth}`, c.SiteName);
           }
         }
@@ -617,14 +641,14 @@ async function calculateAll({ site } = {}) {
               }, t);
             }
             await t.run(UPDATE_CALC_SQL, {
-              id: existing.Id, utility: g.utility, site: sName, value,
+              id: existing.Id, utility: g.utility, site: sName, value: String(value),
               units: meta.units, code: g.code, indicator: meta.name, indicatorId: meta.id,
             });
             keptIds.push(existing.Id);
           } else {
             const r = await t.run(INSERT_CALC_SQL, {
               month, utilityTypeId: ut.Id, siteId: gSiteId, utility: g.utility, site: sName,
-              value, previous: null, units: meta.units, code: g.code, indicator: meta.name, indicatorId: meta.id,
+              value: String(value), previous: null, units: meta.units, code: g.code, indicator: meta.name, indicatorId: meta.id,
             });
             keptIds.push(r.lastInsertRowid);
           }
@@ -644,12 +668,16 @@ async function calculateAll({ site } = {}) {
       const aggSite = await t.get('SELECT Id FROM Sites WHERE SiteName = ?', [siteName]);
       if (!aggSite) continue;
 
+      // Every month with data is a candidate; isMonthComplete then drops any
+      // month that has even one Pending row so NRV never sums partial data.
       const aggMonths = (
         await t.all(
-          "SELECT DISTINCT PostingDateMonth AS m FROM Gto_Invoices WHERE SiteId = ? AND PostingDateMonth IS NOT NULL AND Hitl IN ('Validated', 'Modified and Validated')",
+          'SELECT DISTINCT PostingDateMonth AS m FROM Gto_Invoices WHERE SiteId = ? AND PostingDateMonth IS NOT NULL',
           [aggSite.Id]
         )
-      ).map((r) => r.m);
+      )
+        .map((r) => r.m)
+        .filter((m) => isMonthComplete(aggSite.Id, m));
 
       const upsertAgg = async (month, utility, code, value, units, id, name) => {
         const existing = await t.get(AGG_FIND_SQL, [aggSite.Id, utility, month]);
@@ -671,12 +699,12 @@ async function calculateAll({ site } = {}) {
               changedBy: 'System (recalc)',
             }, t);
           }
-          await t.run(UPDATE_CALC_SQL, { id: existing.Id, utility, site: siteName, value, units, code, indicator: name, indicatorId: id });
+          await t.run(UPDATE_CALC_SQL, { id: existing.Id, utility, site: siteName, value: String(value), units, code, indicator: name, indicatorId: id });
           keptIds.push(existing.Id);
         } else {
           const r = await t.run(INSERT_CALC_SQL, {
             month, utilityTypeId: null, siteId: aggSite.Id, utility, site: siteName,
-            value, previous: null, units, code, indicator: name, indicatorId: id,
+            value: String(value), previous: null, units, code, indicator: name, indicatorId: id,
           });
           keptIds.push(r.lastInsertRowid);
         }
@@ -718,8 +746,8 @@ async function calculateAll({ site } = {}) {
         `DELETE FROM tbl_ulpure_data
          WHERE DataSource = 'Calculated'
            AND Id NOT IN (${placeholders})
-           AND ReviewStatus != 'Reviewed'
-           AND ulpure_status != 'Validated'
+           AND COALESCE(ReviewStatus, '') != 'Reviewed'
+           AND COALESCE(ulpure_status, '') != 'Validated'
            ${siteClause}`,
         [...keptIds, ...siteArg]
       );
@@ -727,8 +755,8 @@ async function calculateAll({ site } = {}) {
       await t.run(
         `DELETE FROM tbl_ulpure_data
          WHERE DataSource = 'Calculated'
-           AND ReviewStatus != 'Reviewed'
-           AND ulpure_status != 'Validated'
+           AND COALESCE(ReviewStatus, '') != 'Reviewed'
+           AND COALESCE(ulpure_status, '') != 'Validated'
            ${siteClause}`,
         siteArg
       );
