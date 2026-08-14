@@ -543,34 +543,8 @@ async function calculateAll({ site } = {}) {
 
         const existing = await t.get(FIND_CALC_SQL, [c.SiteId, c.UtilityTypeId, c.PostingDateMonth, o.code]);
         if (existing) {
-          // Never overwrite a value that's already been validated/reviewed for this month.
-          if (existing.ReviewStatus === 'Reviewed' || existing.UlpureStatus === 'Validated') {
-            keptIds.push(existing.Id);
-            results.push({ ...c, indicator: indicatorName, value: existing.Consumption, units, locked: true });
-            continue;
-          }
-          // Record recalculated changes so they surface in the History panel.
-          if (Number(existing.Consumption) !== value) {
-            await logChange({
-              tableName: 'UlpureData',
-              recordId: existing.Id,
-              fieldName: 'Consumption',
-              oldValue: existing.Consumption,
-              newValue: value,
-              changedBy: 'System (recalc)',
-            }, t);
-          }
-          await t.run(UPDATE_CALC_SQL, {
-            id: existing.Id,
-            utility: o.utility || c.UtilityName,
-            site: c.SiteName,
-            value: String(value),
-            units,
-            code: o.code,
-            indicator: indicatorName,
-            indicatorId,
-          });
           keptIds.push(existing.Id);
+          results.push({ ...c, indicator: indicatorName, value: existing.Consumption, units, locked: true });
         } else {
           const res = await t.run(INSERT_CALC_SQL, {
             month: c.PostingDateMonth,
@@ -624,27 +598,8 @@ async function calculateAll({ site } = {}) {
           const value = factor ? Math.round(raw * factor) / factor : raw;
           const existing = await t.get(FIND_CALC_SQL, [gSiteId, ut.Id, month, g.code]);
           if (existing) {
-            // Never overwrite a value that's already been validated/reviewed for this month.
-            if (existing.ReviewStatus === 'Reviewed' || existing.UlpureStatus === 'Validated') {
-              keptIds.push(existing.Id);
-              results.push({ SiteId: gSiteId, SiteName: sName, PostingDateMonth: month, indicator: meta.name, value: existing.Consumption, units: meta.units, locked: true });
-              continue;
-            }
-            if (Number(existing.Consumption) !== value) {
-              await logChange({
-                tableName: 'UlpureData',
-                recordId: existing.Id,
-                fieldName: 'Consumption',
-                oldValue: existing.Consumption,
-                newValue: value,
-                changedBy: 'System (recalc)',
-              }, t);
-            }
-            await t.run(UPDATE_CALC_SQL, {
-              id: existing.Id, utility: g.utility, site: sName, value: String(value),
-              units: meta.units, code: g.code, indicator: meta.name, indicatorId: meta.id,
-            });
             keptIds.push(existing.Id);
+            results.push({ SiteId: gSiteId, SiteName: sName, PostingDateMonth: month, indicator: meta.name, value: existing.Consumption, units: meta.units, locked: true });
           } else {
             const r = await t.run(INSERT_CALC_SQL, {
               month, utilityTypeId: ut.Id, siteId: gSiteId, utility: g.utility, site: sName,
@@ -682,25 +637,8 @@ async function calculateAll({ site } = {}) {
       const upsertAgg = async (month, utility, code, value, units, id, name) => {
         const existing = await t.get(AGG_FIND_SQL, [aggSite.Id, utility, month]);
         if (existing) {
-          // Overwrite guard: never clobber a value an auditor has reviewed or
-          // edited/validated. Keep the row (so the prune step spares it) and skip.
-          if (existing.ReviewStatus === 'Reviewed' || existing.UlpureStatus === 'Validated') {
-            keptIds.push(existing.Id);
-            results.push({ SiteId: aggSite.Id, SiteName: siteName, PostingDateMonth: month, indicator: name, value: existing.Consumption, units, locked: true });
-            return;
-          }
-          if (String(existing.Consumption) !== String(value)) {
-            await logChange({
-              tableName: 'UlpureData',
-              recordId: existing.Id,
-              fieldName: 'Consumption',
-              oldValue: existing.Consumption,
-              newValue: value,
-              changedBy: 'System (recalc)',
-            }, t);
-          }
-          await t.run(UPDATE_CALC_SQL, { id: existing.Id, utility, site: siteName, value: String(value), units, code, indicator: name, indicatorId: id });
           keptIds.push(existing.Id);
+          results.push({ SiteId: aggSite.Id, SiteName: siteName, PostingDateMonth: month, indicator: name, value: existing.Consumption, units, locked: true });
         } else {
           const r = await t.run(INSERT_CALC_SQL, {
             month, utilityTypeId: null, siteId: aggSite.Id, utility, site: siteName,
