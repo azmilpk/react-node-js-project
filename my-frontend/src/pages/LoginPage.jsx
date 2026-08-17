@@ -34,6 +34,7 @@ function LoginPage() {
       'authUser',
       JSON.stringify({
         name: user.Name || user.name,
+        email: user.Email || user.email || '',
         userId: user.UserId || user.userId || user.id,
         role: actualRole,
       })

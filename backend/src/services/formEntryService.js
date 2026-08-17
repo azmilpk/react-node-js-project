@@ -153,6 +153,9 @@ const insertFormEntry = async (data) => {
     validateUser: data.validateUser || null,
     validatorLoginTime: data.validatorLoginTime || null,
     approver: data.approver || null,
+    // Köping Water constants; other sites/utilities leave these NULL.
+    freshWater: (siteCode === 'Köping' && utilityName === 'Water') ? 0.9 : null,
+    evaporation: (siteCode === 'Köping' && utilityName === 'Water') ? 1.25 : null,
     utilityTypeId,
     siteId,
     templateType: utilityName,
@@ -193,6 +196,8 @@ const insertFormEntry = async (data) => {
         Site = @site,
         Facility = @facility,
         FormulaCode = @formulaCode,
+        FreshWaterStaticValue = @freshWater,
+        EvaporationFactorValue = @evaporation,
         ModifiedBy = @createdBy,
         ModifiedAt = GETDATE()
       WHERE Id = @id`,
@@ -226,7 +231,9 @@ const insertFormEntry = async (data) => {
         Site,
         Facility,
         ValueSlot,
-        FormulaCode
+        FormulaCode,
+        FreshWaterStaticValue,
+        EvaporationFactorValue
       )
       VALUES
       (
@@ -251,7 +258,9 @@ const insertFormEntry = async (data) => {
         @site,
         @facility,
         @valueSlot,
-        @formulaCode
+        @formulaCode,
+        @freshWater,
+        @evaporation
       )`,
     params
   );
@@ -367,6 +376,8 @@ const updateFormEntry = async (id, data) => {
       Consumption = ?,
       Comments = ?,
       Hitl = ?,
+      ValidateUser = ?,
+      ValidatorLoginTime = GETDATE(),
       ModifiedBy = ?,
       ModifiedAt = GETDATE()
     WHERE Id = ?`,
@@ -375,6 +386,7 @@ const updateFormEntry = async (id, data) => {
       newValues.Consumption,
       newValues.Comments,
       newValues.Hitl,
+      changedBy,
       changedBy,
       id,
     ]

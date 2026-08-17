@@ -23,3 +23,16 @@ export const getCurrentUserRole = () => {
   }
   return 'SiteOwner';
 };
+
+export const getCurrentUserEmail = () => {
+  try {
+    const stored = localStorage.getItem('authUser');
+    if (stored) {
+      const parsed = JSON.parse(stored);
+      return parsed?.email || parsed?.userId || 'unknown';
+    }
+  } catch (e) {
+    // ignore parse errors
+  }
+  return 'unknown';
+};

@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import TopNavbar from '../components/topnavbar/TopNavbar';
 import { formConfigBySiteUtility } from '../config/formConfig';
 import { API_BASE_URL, authFetch } from '../config/api';
+import { getCurrentUserEmail } from '../utils/currentUser';
 
 function FormDetailsPage() {
   const navigate = useNavigate();
@@ -166,7 +167,7 @@ function FormDetailsPage() {
           formValues.producedQuantity ||
           '',
         status: 'Pending',
-        createdBy: 'Bot_02',
+        createdBy: getCurrentUserEmail(),
         fileName: uploadedFileData.fileName,
         fileUrl: uploadedFileData.fileUrl,
       };
