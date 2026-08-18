@@ -348,6 +348,14 @@ const kopingForms = {
         placeholder: 'Enter the handler',
         required: true,
       },
+        {
+        name: 'units',
+        label: 'Units',
+        type: 'text',
+        required: true,
+        defaultValue: 'm3',
+      },
+
       {
         name: 'postingMonth',
         label: 'Posting Date Month',

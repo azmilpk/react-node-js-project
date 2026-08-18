@@ -79,13 +79,11 @@ function SiteOwnerPage() {
     return `${selectedFacility}-${selectedSite}`;
   };
 
+  // Enter Data goes DIRECTLY to the static form.
+  // No facility/site selection required.
   const handleEnterData = () => {
-    if (!selectedFacility || !selectedSite) {
-      setError('Please select both facility and site.');
-      return;
-    }
     setError('');
-    navigate('/facility-selection', {
+    navigate('/static-form-details', {
       state: {
         facility: selectedFacility,
         site: selectedSite,
