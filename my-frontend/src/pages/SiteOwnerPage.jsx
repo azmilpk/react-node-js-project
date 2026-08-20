@@ -20,14 +20,12 @@ function SiteOwnerPage() {
   const navigate = useNavigate();
   const [isLoaded, setIsLoaded] = useState(false);
 
-  // Trigger animation after page mounts
   useEffect(() => {
     setIsLoaded(true);
   }, []);
 
-  // Load saved selection from cache on first render
   const getSaved = () => {
-    const cached = loadPersistentCache(SITE_CACHE_KEY, 24 * 60 * 60 * 1000); // 24 hours
+    const cached = loadPersistentCache(SITE_CACHE_KEY, 24 * 60 * 60 * 1000);
     return cached?.data || { facility: '', site: '' };
   };
 
@@ -41,7 +39,6 @@ function SiteOwnerPage() {
     ? siteOptions[selectedFacility] || []
     : [];
 
-  // Save selection to cache whenever it changes
   useEffect(() => {
     if (selectedFacility || selectedSite) {
       savePersistentCache(SITE_CACHE_KEY, {
@@ -79,8 +76,6 @@ function SiteOwnerPage() {
     return `${selectedFacility}-${selectedSite}`;
   };
 
-  // Enter Data goes DIRECTLY to the static form.
-  // No facility/site selection required.
   const handleEnterData = () => {
     setError('');
     navigate('/static-form-details', {
@@ -107,13 +102,13 @@ function SiteOwnerPage() {
     });
   };
 
-  const handleFileDashboard = () => {
+  const handleDashboard = () => {
     if (!selectedFacility || !selectedSite) {
       setError('Please select both facility and site.');
       return;
     }
     setError('');
-    navigate('/file-dashboard', {
+    navigate('/dashboard', {
       state: {
         facility: selectedFacility,
         site: selectedSite,
@@ -151,10 +146,10 @@ function SiteOwnerPage() {
       action: handleValidateData,
     },
     {
-      title: 'File Dashboard',
-      desc: 'View uploaded files and track their status.',
+      title: 'Dashboard',
+      desc: 'View file uploads & track consumption trends.',
       icon: fileDashboardIcon,
-      action: handleFileDashboard,
+      action: handleDashboard,
     },
     {
       title: 'UL Pure',
@@ -217,7 +212,6 @@ function SiteOwnerPage() {
             </p>
           )}
 
-          {/* Cards Grid */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 mb-6 w-full mx-auto">
             {cardsData.map((card, idx) => (
               <div

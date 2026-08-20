@@ -1,5 +1,6 @@
 const db = require('../config/db');
 const { logChange } = require('./auditService');
+const { ids: REGON_IDS, names: REGION_NAMES } = require('../config/regonIds');
 
 // 'YYYY-MM' -> previous month 'YYYY-MM'
 function prevMonth(ym) {
@@ -393,9 +394,11 @@ const FIND_CALC_SQL = `
 const INSERT_CALC_SQL = `
   INSERT INTO tbl_ulpure_data
     (PostingDateMonth, UtilityTypeId, SiteId, Utility, Site,
-     Consumption, PreviousConsumptionUL, Units, ulpure_status, FormulaCode, [Indicator Name], [Indicator ID], DataSource)
+     Consumption, PreviousConsumptionUL, Units, ulpure_status, FormulaCode, [Indicator Name], [Indicator ID], DataSource,
+     [Region ID], [Region Name], date)
   VALUES (@month, @utilityTypeId, @siteId, @utility, @site,
-          @value, @previous, @units, 'Validate', @code, @indicator, @indicatorId, 'Calculated')
+          @value, @previous, @units, 'Validate', @code, @indicator, @indicatorId, 'Calculated',
+          @regionId, @regionName, CAST(GETDATE() AS date))
 `;
 
 const UPDATE_CALC_SQL = `
@@ -558,6 +561,8 @@ async function calculateAll({ site } = {}) {
             code: o.code,
             indicator: indicatorName,
             indicatorId,
+            regionId: REGON_IDS[c.SiteName] || null,
+            regionName: REGION_NAMES[c.SiteName] || null,
           });
           keptIds.push(res.lastInsertRowid);
         }
@@ -604,6 +609,8 @@ async function calculateAll({ site } = {}) {
             const r = await t.run(INSERT_CALC_SQL, {
               month, utilityTypeId: ut.Id, siteId: gSiteId, utility: g.utility, site: sName,
               value: String(value), previous: null, units: meta.units, code: g.code, indicator: meta.name, indicatorId: meta.id,
+              regionId: REGON_IDS[sName] || null,
+              regionName: REGION_NAMES[sName] || null,
             });
             keptIds.push(r.lastInsertRowid);
           }
@@ -643,6 +650,8 @@ async function calculateAll({ site } = {}) {
           const r = await t.run(INSERT_CALC_SQL, {
             month, utilityTypeId: null, siteId: aggSite.Id, utility, site: siteName,
             value: String(value), previous: null, units, code, indicator: name, indicatorId: id,
+            regionId: REGON_IDS[siteName] || null,
+            regionName: REGION_NAMES[siteName] || null,
           });
           keptIds.push(r.lastInsertRowid);
         }

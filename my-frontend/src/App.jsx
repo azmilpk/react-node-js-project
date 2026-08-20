@@ -13,6 +13,8 @@ import ProfilePage from './pages/ProfilePage';
 import AuditorUlPurePage from './pages/AuditorUlPurePage';
 import AuditorValidatePage from './pages/AuditorValidatePage';
 import ProtectedRoute from './components/topnavbar/ProtectedRoute';
+import FileDashboardPage from './pages/FileDashboardPage';
+import ConsumptionTrendPage from './pages/ConsumptionTrendPage';
 import DashboardPage from './pages/DashboardPage';
 
 function App() {
@@ -53,7 +55,17 @@ function App() {
         } />
         <Route path="/file-dashboard" element={
           <ProtectedRoute allowedRoles={['SiteOwner', 'Admin']}>
+            <FileDashboardPage />
+          </ProtectedRoute>
+        } />
+        <Route path="/dashboard" element={
+          <ProtectedRoute allowedRoles={['SiteOwner', 'Admin']}>
             <DashboardPage />
+          </ProtectedRoute>
+        } />
+        <Route path="/consumption-trend" element={
+          <ProtectedRoute allowedRoles={['SiteOwner', 'Admin']}>
+            <ConsumptionTrendPage />
           </ProtectedRoute>
         } />
         <Route path="/validate-details" element={

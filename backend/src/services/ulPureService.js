@@ -1,5 +1,5 @@
 const db = require('../config/db');
-const REGON_IDS = require('../config/regonIds');
+const { ids: REGON_IDS, names: REGION_NAMES } = require('../config/regonIds');
 const { logFieldChanges } = require('./auditService');
 const { calculateAll, prevMonth, FORMULA_DESCRIPTIONS, NRV_SUM_UTILITIES } = require('./calculationService');
 
@@ -37,6 +37,9 @@ const UL_COLUMNS = `
   FormulaCode,
   [Indicator Name] AS IndicatorName,
   [Indicator ID] AS IndicatorId,
+  [Region ID] AS RegonId,
+  [Region Name] AS RegionName,
+  date AS Date,
   DataSource
 `;
 
@@ -90,7 +93,10 @@ const insertUlPureEntryFromFormEntry = async (formEntry) => {
       FileName,
       FileUrl,
       CreatedBy,
-      DataSource
+      DataSource,
+      [Region ID],
+      [Region Name],
+      date
     )
     VALUES (
       @sourceEntryId,
@@ -113,7 +119,10 @@ const insertUlPureEntryFromFormEntry = async (formEntry) => {
       @fileName,
       @fileUrl,
       @createdBy,
-      'Manual'
+      'Manual',
+      @regionId,
+      @regionName,
+      CAST(GETDATE() AS date)
     )`,
     {
       sourceEntryId: formEntry.Id,
@@ -131,11 +140,13 @@ const insertUlPureEntryFromFormEntry = async (formEntry) => {
       accountMeterNo: formEntry.AccountMeterNo || '',
       units: formEntry.Units || '',
       consumption: formEntry.Consumption || 0,
-      status: 'Validate', // <-- BLUE STATUS
+      status: 'Validate',
       comment: formEntry.Comment || '',
       fileName: formEntry.FileName || '',
       fileUrl: formEntry.FileUrl || '',
       createdBy: formEntry.CreatedBy || '',
+      regionId: REGON_IDS[formEntry.SiteCode] || null,
+      regionName: REGION_NAMES[formEntry.SiteCode] || null,
     }
   );
 

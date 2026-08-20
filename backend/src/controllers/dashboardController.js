@@ -125,8 +125,53 @@ const getDashboardUtilities = async (req, res, next) => {
   }
 };
 
+// Returns monthly consumption totals grouped by PostingDateMonth + UtilityName.
+// Accepts ?siteName=Köping or ?siteId=1 and optional ?utilityName=Electricity.
+const getConsumptionTrend = async (req, res, next) => {
+  try {
+    const { siteName, siteId, utilityName } = req.query;
+
+    const params = [];
+    let whereClause = 'WHERE 1=1';
+
+    if (siteId) {
+      whereClause += ' AND g.SiteId = ?';
+      params.push(siteId);
+    } else if (siteName) {
+      whereClause += ' AND s.SiteName = ?';
+      params.push(siteName);
+    }
+
+    if (utilityName) {
+      whereClause += ' AND g.Templatetype = ?';
+      params.push(utilityName);
+    }
+
+    const rows = await db.all(
+      `SELECT
+         g.Postingdatemonth AS month,
+         g.Templatetype AS utility,
+         g.units AS units,
+         SUM(CAST(g.Consumption AS FLOAT)) AS total
+       FROM Gto_Invoices g
+       LEFT JOIN Sites s ON s.Id = g.SiteId
+       ${whereClause}
+         AND g.Postingdatemonth IS NOT NULL
+         AND g.Templatetype IS NOT NULL
+       GROUP BY g.Postingdatemonth, g.Templatetype, g.units
+       ORDER BY g.Postingdatemonth ASC, g.Templatetype ASC`,
+      params
+    );
+
+    res.json(rows);
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   getDashboardData,
   getDashboardSites,
   getDashboardUtilities,
+  getConsumptionTrend,
 };
