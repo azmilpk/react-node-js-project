@@ -9,12 +9,5 @@ git commit -m "Pushed the Updated code"
 
 # 4. Push to both remotes
 git push origin main
-git push newrepo main
 
 
-origin → hyperautodtfp-bot02_volvo/tti-env-report
-newrepo → VolvoGroup-Internal/TTI_Ecosphere
-
-# To push both with one command
-git remote set-url --add --push origin https://github.com/hyperautodtfp-bot02_volvo/tti-env-report.git
-git remote set-url --add --push origin https://github.com/VolvoGroup-Internal/TTI_Ecosphere.git

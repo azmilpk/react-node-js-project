@@ -1,5 +1,5 @@
 require('dotenv').config();
-// Schema is managed externally in Azure SQL — no startup migrations/seeds.
+require('./config/migrate');
 
 const express = require('express');
 const cors = require('cors');
@@ -10,7 +10,7 @@ const formEntryRoutes = require('./routes/formEntryRoutes');
 const fileRoutes = require('./routes/fileRoutes');
 const authRoutes = require('./routes/authRoutes');
 const ulPureRoutes = require('./routes/ulPureRoutes');
-const auditRoutes = require('./routes/auditRoutes');   // ← ADD THIS
+const auditRoutes = require('./routes/auditRoutes');
 const dashboardRoutes = require('./routes/dashboardRoutes');
 
 const errorHandler = require('./middleware/errorHandler');
@@ -41,12 +41,13 @@ app.get('/', (req, res) => {
 
 app.get('/api/test-db', async (req, res) => {
   try {
-    const result = await db.get('SELECT GETDATE() AS currentTime');
+    const result = await db.get("SELECT datetime('now') AS currentTime");
     res.json({ message: 'Database connected successfully', data: result });
   } catch (error) {
     res.status(500).json({ message: 'Database connection failed', error: error.message });
   }
 });
+
 
 app.get('/api/test-blob', async (req, res) => {
   try {

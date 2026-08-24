@@ -1,6 +1,6 @@
-# Database Schema Design — TTI Environmental Reporting (Azure SQL)
+# Database Schema Design — EcoSphere Environmental Reporting
 
-> Database: `TTI_ENV_DATA_DB_PROD` on Azure SQL. This document describes the data
+> Database: `ECOSPHERE_DATA_DB` (Azure SQL / SQLite Compatible). This document describes the data
 > model the application depends on. Design-first: the schema below is the
 > contract every service, controller, and calculation reads from.
 

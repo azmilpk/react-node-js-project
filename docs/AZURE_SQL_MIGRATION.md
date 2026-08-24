@@ -17,9 +17,9 @@ Current (SQLite):
 const Database = require('better-sqlite3');
 const path = require('path');
 
-// NOTE: the real DB file is tti_env_report.db at the PROJECT ROOT
+// NOTE: the real DB file is ecosphere_report.db at the PROJECT ROOT
 // (not backend/data/database.db).
-const db = new Database(path.join(__dirname, '../../../tti_env_report.db'));
+const db = new Database(path.join(__dirname, '../../../ecosphere_report.db'));
 db.pragma('journal_mode = WAL');   // SQLite-only — REMOVE for Azure SQL
 db.pragma('foreign_keys = ON');    // SQLite-only — REMOVE for Azure SQL
 module.exports = db;
@@ -286,8 +286,8 @@ This is the trickiest file. It currently:
 - Logs recalc deltas via `auditService.logChange` → keep, but it becomes async too.
 
 ### Step 6 — Migrate the EXISTING data (not just schema)
-The steps above create empty tables. To carry over current rows from `tti_env_report.db`:
-1. Export each table from SQLite (e.g. `sqlite3 tti_env_report.db ".mode csv" ".output X.csv" "SELECT * FROM X;"`).
+The steps above create empty tables. To carry over current rows from `ecosphere_report.db`:
+1. Export each table from SQLite (e.g. `sqlite3 ecosphere_report.db ".mode csv" ".output X.csv" "SELECT * FROM X;"`).
 2. Bulk-load into Azure SQL (`BULK INSERT`, `bcp`, or Azure Data Studio import).
 3. Re-seed `UtilityTypes`/`Sites` first (FK targets), then load `GtoInvoices`/`UlpureData`/`FormEntries`/`AuditLog`.
 Alternatively, just re-run the Excel importers against Azure after the driver swap and let the calc engine regenerate `UlpureData`.

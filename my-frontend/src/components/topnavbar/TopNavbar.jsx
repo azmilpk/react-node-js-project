@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import violinLogo from '../../assets/images/violinLogo.png';
+import brandIcon from '../../assets/images/brandIcon.svg';
 
 import downloadIcon from '../../assets/NavbarVector/downloadbt.svg';
 import settingsIcon from '../../assets/NavbarVector/settings.svg';
@@ -51,8 +51,8 @@ function TopNavbar() {
         {/* Left Logo */}
         <div className="flex items-center">
           <img
-            src={violinLogo}
-            alt="Violin logo"
+            src={brandIcon}
+            alt="EcoSphere logo"
             className="h-7 w-auto object-contain"
           />
         </div>
@@ -60,7 +60,7 @@ function TopNavbar() {
         {/* Center Title */}
         <div className="flex items-center justify-center">
           <span className="text-[18px] font-semibold tracking-[0.2px]">
-            TTI ENV IDP
+            ECOSPHERE PORTAL
           </span>
         </div>
 
@@ -155,8 +155,8 @@ function TopNavbar() {
             {profileOpen && (
               <div className="absolute right-0 mt-2 w-[180px] rounded-[12px] bg-white text-black shadow-lg border border-black/10 overflow-hidden z-50">
                 <div className="px-4 py-3 text-[13px] border-b border-black/10">
-                  <div className="font-semibold">Bot_02</div>
-                  <div className="text-black/60">HyperAuto_DT_FP</div>
+                  <div className="font-semibold">Operations User</div>
+                  <div className="text-black/60">Sustainability Team</div>
                 </div>
 
                 <button

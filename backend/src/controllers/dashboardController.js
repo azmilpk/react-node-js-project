@@ -118,7 +118,8 @@ const getDashboardSites = async (req, res, next) => {
 
 const getDashboardUtilities = async (req, res, next) => {
   try {
-    const rows = await db.all('SELECT UtilityTypeID AS Id, UtilityName FROM UtilityTypes ORDER BY UtilityName');
+    const rows = await db.all('SELECT Id, UtilityName FROM UtilityTypes ORDER BY UtilityName');
+
     res.json(rows);
   } catch (error) {
     next(error);

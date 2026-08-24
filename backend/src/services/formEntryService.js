@@ -19,7 +19,8 @@ const resolveSiteId = async (siteName) => {
 const resolveUtilityId = async (utilityName) => {
   if (!utilityName) return null;
   const row = await db.get(
-    'SELECT UtilityTypeID AS Id FROM UtilityTypes WHERE UtilityName = ?',
+    'SELECT Id FROM UtilityTypes WHERE UtilityName = ?',
+
     [utilityName]
   );
   return row ? row.Id : null;
@@ -94,8 +95,8 @@ const ENTRY_COLUMNS = `
   g.Id AS Id,
   s.SiteName AS SiteCode,
   s.SiteName AS Site,
-  CASE WHEN g.site = 'NRV' THEN g.site ELSE g.facility END AS FacilityCode,
-  g.Templatetype AS UtilityName,
+  CASE WHEN s.SiteName = 'NRV' THEN s.SiteName ELSE g.Facility END AS FacilityCode,
+  g.TemplateType AS UtilityName,
   g.Postingdatemonth AS PostingMonth,
   g.Accountnumber AS AccountMeterNo,
   g.units AS Units,

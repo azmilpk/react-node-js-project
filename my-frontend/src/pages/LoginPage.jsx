@@ -152,7 +152,7 @@ function LoginPage() {
           <div className="space-y-3 text-left">
             <div>
               <label className="block text-[13px] font-semibold text-white mb-2">
-                Emails
+                Email
               </label>
               <input
                 type="email"
@@ -212,7 +212,7 @@ function LoginPage() {
               disabled={isLoading}
               className="w-full h-10 rounded-full bg-white text-black text-sm font-semibold hover:opacity-80 transition-all duration-300 disabled:opacity-60 flex items-center justify-center gap-2"
             >
-              Sign in with Microsoft
+              Sign in with Enterprise SSO
             </button>
 
             <button

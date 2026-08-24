@@ -1,132 +1,125 @@
-const sql = require('mssql');
+const Database = require('better-sqlite3');
+const path = require('path');
 
-// Azure SQL connection config. Credentials come from backend/.env — never
-// hard-code them. Fill in DB_SERVER / DB_NAME / DB_USER / DB_PASSWORD there.
-const config = {
-  server: process.env.DB_SERVER,
-  database: process.env.DB_NAME,
-  user: process.env.DB_USER,
-  password: process.env.DB_PASSWORD,
-  port: process.env.DB_PORT ? Number(process.env.DB_PORT) : 1433,
-  options: {
-    // Azure SQL requires an encrypted connection.
-    encrypt: true,
-    trustServerCertificate:
-      String(process.env.DB_TRUST_SERVER_CERT).toLowerCase() === 'true',
-  },
-  pool: {
-    max: 10,
-    min: 0,
-    idleTimeoutMillis: 30000,
-  },
-  // Allow slower VPN/private-endpoint handshakes before giving up.
-  connectionTimeout: 30000,
-  requestTimeout: 30000,
-};
+const dbPath = process.env.DB_FILE || path.join(__dirname, '../../../ecosphere_report.db');
 
-// Single shared connection pool (Azure closes idle connections, so we let the
-// pool manage reconnection). Cached as a promise so concurrent callers share it.
-let poolPromise;
-const getPool = () => {
-  if (!poolPromise) {
-    poolPromise = sql
-      .connect(config)
-      .then((pool) => {
-        console.log('Connected to Azure SQL database');
-        return pool;
-      })
-      .catch((err) => {
-        // Reset so the next call retries instead of caching a failed connect.
-        poolPromise = undefined;
-        throw err;
-      });
-  }
-  return poolPromise;
-};
+const db = new Database(dbPath);
 
-// mssql rejects `undefined`; normalize it to a real NULL.
-const clean = (v) => (v === undefined ? null : v);
+// Enable WAL mode and foreign keys for performance and consistency
+db.pragma('journal_mode = WAL');
+db.pragma('foreign_keys = ON');
 
-// Bind params onto an mssql request.
-//   - Array  -> positional: bound as @p0, @p1, ... (the SQL's `?` are rewritten)
-//   - Object -> named:      bound as @key (the SQL already uses @key)
-const bindParams = (request, params) => {
-  if (Array.isArray(params)) {
-    params.forEach((v, i) => request.input(`p${i}`, clean(v)));
-  } else if (params && typeof params === 'object') {
-    for (const [k, v] of Object.entries(params)) request.input(k, clean(v));
-  }
-  return request;
-};
+console.log(`Connected to SQLite database at ${dbPath}`);
 
-// Rewrite SQLite-style positional `?` placeholders into @p0, @p1, ... so they
-// match the params bound above. Only used when params is an array.
-const toNamedPlaceholders = (text) => {
-  let i = 0;
-  return text.replace(/\?/g, () => `@p${i++}`);
-};
+// Helper to normalize T-SQL constructs to SQLite standard SQL
+const normalizeSql = (sqlText, params) => {
+  let sql = sqlText;
 
-const prepare = (request, text, params) => {
-  bindParams(request, params);
-  const query = Array.isArray(params) ? toNamedPlaceholders(text) : text;
-  return { request, query };
-};
+  // 1. T-SQL date functions
+  sql = sql.replace(/\bCAST\(GETDATE\(\)\s+AS\s+date\)/gi, "date('now')");
+  sql = sql.replace(/\bGETDATE\(\)/gi, "datetime('now')");
 
-const runOn = async (baseRequest, text, params) => {
-  const { request, query } = prepare(baseRequest, text, params);
-  const result = await request.query(query);
-  return result.recordset || [];
-};
+  // 2. T-SQL SCOPE_IDENTITY() batch statements
+  sql = sql.replace(/;\s*SELECT\s+SCOPE_IDENTITY\(\)\s+AS\s+\w+;?/gi, '');
 
-// INSERT/UPDATE/DELETE helper. Appends SCOPE_IDENTITY() so callers relying on
-// the old better-sqlite3 `lastInsertRowid` keep working after an INSERT.
-const execOn = async (baseRequest, text, params) => {
-  const { request, query } = prepare(baseRequest, text, params);
-  const result = await request.query(
-    `${query}\n; SELECT SCOPE_IDENTITY() AS lastInsertRowid;`
-  );
-  const affected = Array.isArray(result.rowsAffected)
-    ? result.rowsAffected[0]
-    : result.rowsAffected;
-  const lastRow = result.recordset && result.recordset[0];
-  return {
-    changes: affected,
-    lastInsertRowid: lastRow ? lastRow.lastInsertRowid : undefined,
-  };
-};
-
-// ── Pool-scoped helpers (each call grabs a fresh request from the pool) ──
-const all = async (text, params) => runOn((await getPool()).request(), text, params);
-const get = async (text, params) => (await all(text, params))[0];
-const run = async (text, params) => execOn((await getPool()).request(), text, params);
-const exec = async (text) => {
-  const pool = await getPool();
-  await pool.request().batch(text);
-};
-
-// Run `fn` inside a single transaction. `fn` receives a tx-scoped API with the
-// same get/all/run helpers; commits on success, rolls back on any error.
-const transaction = async (fn) => {
-  const pool = await getPool();
-  const tx = new sql.Transaction(pool);
-  await tx.begin();
-  const txApi = {
-    all: (text, params) => runOn(new sql.Request(tx), text, params),
-    get: async (text, params) => (await txApi.all(text, params))[0],
-    run: (text, params) => execOn(new sql.Request(tx), text, params),
-  };
-  try {
-    const result = await fn(txApi);
-    await tx.commit();
-    return result;
-  } catch (err) {
-    try {
-      await tx.rollback();
-    } catch {
-      // Ignore rollback errors (e.g. tx already aborted); surface the original.
+  // 3. T-SQL TOP N -> SQLite LIMIT N
+  if (/\bSELECT\s+TOP\s+(\d+)\s+/i.test(sql)) {
+    let topCount = 1;
+    sql = sql.replace(/\bSELECT\s+TOP\s+(\d+)\s+/i, (match, count) => {
+      topCount = count;
+      return 'SELECT ';
+    });
+    if (!/\bLIMIT\b/i.test(sql)) {
+      sql = sql.trim().replace(/;$/, '') + ` LIMIT ${topCount};`;
     }
-    throw err;
   }
+
+  // 4. Normalize legacy / Azure SQL table and column names for SQLite
+  sql = sql.replace(/\bGto_Invoices\b/gi, 'GtoInvoices');
+  sql = sql.replace(/\btbl_ulpure_data\b/gi, 'UlpureData');
+  sql = sql.replace(/\bcreateddate\b/gi, 'CreatedAt');
+  sql = sql.replace(/\bHitl\b/gi, 'Status');
+  sql = sql.replace(/\bulpure_status\b/gi, 'UlpureStatus');
+  sql = sql.replace(/\[Indicator\s+Name\]/gi, 'IndicatorName');
+  sql = sql.replace(/\[Indicator\s+ID\]/gi, 'IndicatorId');
+  sql = sql.replace(/\[Region\s+ID\]/gi, 'RegonId');
+  sql = sql.replace(/\[Region\s+Name\]/gi, 'RegionName');
+
+  // 5. If params is an array, convert @p0, @p1, ... to ?
+  if (Array.isArray(params) && /@p\d+/.test(sql)) {
+    sql = sql.replace(/@p\d+/g, '?');
+  }
+
+  return sql;
 };
 
-module.exports = { sql, getPool, all, get, run, exec, transaction };
+const formatParams = (params) => {
+  if (!params) return [];
+  if (Array.isArray(params)) return params;
+  return [params];
+};
+
+const all = async (sqlText, params) => {
+  const sql = normalizeSql(sqlText, params);
+  const stmt = db.prepare(sql);
+  return Array.isArray(params) ? stmt.all(...params) : params ? stmt.all(params) : stmt.all();
+};
+
+const get = async (sqlText, params) => {
+  const sql = normalizeSql(sqlText, params);
+  const stmt = db.prepare(sql);
+  return Array.isArray(params) ? stmt.get(...params) : params ? stmt.get(params) : stmt.get();
+};
+
+const run = async (sqlText, params) => {
+  const sql = normalizeSql(sqlText, params);
+  const stmt = db.prepare(sql);
+  const info = Array.isArray(params) ? stmt.run(...params) : params ? stmt.run(params) : stmt.run();
+  return {
+    changes: info.changes,
+    lastInsertRowid: info.lastInsertRowid,
+  };
+};
+
+const exec = (sqlText) => {
+  db.exec(sqlText);
+};
+
+
+// Transaction wrapper
+const transaction = async (fn) => {
+  const tx = db.transaction((txApi) => fn(txApi));
+  const syncTxApi = {
+    all: (text, params) => {
+      const sql = normalizeSql(text, params);
+      const stmt = db.prepare(sql);
+      return Array.isArray(params) ? stmt.all(...params) : params ? stmt.all(params) : stmt.all();
+    },
+    get: (text, params) => {
+      const sql = normalizeSql(text, params);
+      const stmt = db.prepare(sql);
+      return Array.isArray(params) ? stmt.get(...params) : params ? stmt.get(params) : stmt.get();
+    },
+    run: (text, params) => {
+      const sql = normalizeSql(text, params);
+      const stmt = db.prepare(sql);
+      const info = Array.isArray(params) ? stmt.run(...params) : params ? stmt.run(params) : stmt.run();
+      return {
+        changes: info.changes,
+        lastInsertRowid: info.lastInsertRowid,
+      };
+    },
+  };
+  return fn(syncTxApi);
+};
+
+// Export raw db handle along with helper functions
+module.exports = {
+  db,
+  prepare: (sql) => db.prepare(sql),
+  all,
+  get,
+  run,
+  exec,
+  transaction,
+};

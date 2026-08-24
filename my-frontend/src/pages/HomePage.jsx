@@ -1,12 +1,12 @@
 import { useNavigate } from 'react-router-dom';
 import TopNavbar from '../components/topnavbar/TopNavbar';
 import homeImage from '../assets/images/final.jpg';
-import volvoLogo from '../assets/images/tfinal.png';
+import ecoLogo from '../assets/images/ecoLogo.svg';
 
 function HomePage() {
   const navigate = useNavigate();
-  const userName = 'HyperAuto_DT_FP';
-  const userId = 'Bot_02';
+  const userName = 'Operations Admin';
+  const userId = 'Portal_User_01';
 
   const handleAuditorLogin = () => {
     navigate('/login', {
@@ -26,8 +26,6 @@ function HomePage() {
 
   return (
     <div className="w-full h-screen overflow-hidden flex flex-col bg-black">
-     
-
       <main
         className="relative flex-1 min-h-0 bg-cover bg-center bg-no-repeat"
         style={{
@@ -48,13 +46,13 @@ function HomePage() {
             }}
           >
             <h1
-  className="text-emerald-400 font-bold uppercase tracking-[0.18em] leading-tight text-2xl sm:text-1xl lg:text-1xl mb-4"
-  style={{
-    fontFamily: '"Segoe UI", "Helvetica Neue", Arial, sans-serif',
-  }}
->
-  VOLVO ECOSPHERE GLOBAL
-</h1>
+              className="text-emerald-400 font-bold uppercase tracking-[0.18em] leading-tight text-2xl sm:text-1xl lg:text-1xl mb-4"
+              style={{
+                fontFamily: '"Segoe UI", "Helvetica Neue", Arial, sans-serif',
+              }}
+            >
+              ECOSPHERE GLOBAL
+            </h1>
 
             <p className="text-white font-semibold text-lg sm:text-xl mb-1">
               Welcome, <span className="font-bold">{userName}</span>
@@ -96,18 +94,19 @@ function HomePage() {
               </button>
             </div>
 
-           <div className="mt-8 flex justify-center">
-  <img
-    src={volvoLogo}
-    alt="Volvo logo"
-    className="w-44 sm:w-52 lg:w-60 xl:w-64 h-auto object-contain opacity-90"
-  />
-</div>
+            <div className="mt-8 flex justify-center">
+              <img
+                src={ecoLogo}
+                alt="EcoSphere logo"
+                className="w-44 sm:w-52 lg:w-60 xl:w-64 h-auto object-contain opacity-90"
+              />
+            </div>
           </div>
         </div>
       </main>
     </div>
   );
 }
+
 
 export default HomePage;

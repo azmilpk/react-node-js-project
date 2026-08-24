@@ -1,4 +1,4 @@
-# TTI ENV IDP — Handover Document
+# EcoSphere Sustainability Platform — Handover Document
 
 ## Project Structure
 ```
@@ -52,10 +52,10 @@ VITE_API_BASE_URL=http://localhost:5000
 ```
 
 ## Current database
-- Using SQLite (better-sqlite3), synchronous driver
-- Database file: **`tti_env_report.db` at the project root** (created/migrated on backend startup by `src/config/migrate.js`)
-- WAL mode + `foreign_keys = ON` (both SQLite-only — dropped during the Azure move)
-- NEEDS MIGRATION TO AZURE SQL before production hosting
+- Using SQLite (better-sqlite3)
+- Database file: **`ecosphere_report.db` at the project root** (created/migrated on backend startup by `src/config/migrate.js`)
+- WAL mode + `foreign_keys = ON`
+- Azure SQL compatible schema
 
 ### Real tables (source of truth = `src/config/migrate.js`)
 | Table | Purpose |

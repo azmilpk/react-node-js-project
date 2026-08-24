@@ -1,6 +1,5 @@
-// Regon (Region) id per site — shown in the UL Pure report's "Regon Id" column.
-// Hardcoded on purpose: edit a value here when a RegonId changes, then restart
-// the backend. Keys must match the site code stored in the data (row.Site).
+// Regon (Region) id per site — shown in reports
+// Keys match the site code stored in the data (row.Site).
 module.exports = {
   ids: {
     'Köping': '64854062',
@@ -11,11 +10,12 @@ module.exports = {
     'RT100': '80262304',
   },
   names: {
-    'Köping': 'Köping',
-    'NRV': 'New River Valley',
-    'LVLC': 'Lehigh Valley Logistics Center',
-    'Macungie': 'Macungie Vehicle Assembly',
-    'MEC': 'Mack Experience Center',
-    'RT100': 'Route 100 Methods Lab',
+    'Köping': 'Nordic Manufacturing Hub',
+    'NRV': 'New River Valley Assembly',
+    'LVLC': 'Logistics & Distribution Center',
+    'Macungie': 'Eastern Vehicle Assembly',
+    'MEC': 'Modular Engineering Center',
+    'RT100': 'Regional Operations Facility',
   },
 };
+

@@ -11,6 +11,7 @@
     </linearGradient>
   </defs>
   <circle cx="50" cy="50" r="45" fill="url(#ecoGrad)" />
+  <!-- Sustainable Leaf & Globe Dynamic Elements -->
   <path d="M50 18 C32 18 20 32 20 50 C20 68 32 82 50 82 C68 82 80 68 80 50 C80 32 68 18 50 18 Z" fill="none" stroke="rgba(255,255,255,0.25)" stroke-width="2.5" />
   <path d="M22 50 Q50 35 78 50 Q50 65 22 50 Z" fill="none" stroke="rgba(255,255,255,0.3)" stroke-width="2" />
   <path d="M50 20 C65 25 75 42 70 60 C65 72 50 80 50 80 C50 80 35 72 30 60 C25 42 35 25 50 20 Z" fill="url(#leafGrad)" opacity="0.9" />

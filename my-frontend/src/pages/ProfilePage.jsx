@@ -127,7 +127,7 @@ function ProfilePage() {
 
                 <div className="flex items-center gap-4 py-3">
                   <div className="w-[120px] text-[13px] font-semibold text-black/50">Application</div>
-                  <div className="text-[14px] text-black">TTI ENV IDP</div>
+                  <div className="text-[14px] text-black">ECOSPHERE PORTAL</div>
                 </div>
               </div>
             ) : (
@@ -137,28 +137,26 @@ function ProfilePage() {
             )}
           </div>
 
-          {/* Microsoft Account Note */}
+          {/* Account Security Note */}
           <div className="bg-white rounded-[18px] shadow-sm p-6">
             <h2 className="text-[18px] font-semibold text-black mb-2">
               Password & Security
             </h2>
             <p className="text-[13px] text-black/60 mb-4">
-              Your account is managed through Microsoft. To change your password
-              or update security settings, visit your Microsoft account.
+              Your account is authenticated via Enterprise SSO / Identity Provider. To change your password
+              or update security credentials, manage your organizational account.
             </p>
             <a
-              href="https://myaccount.microsoft.com"
+              href="https://account.activedirectory.windowsazure.com"
               target="_blank"
               rel="noreferrer"
               className="inline-flex items-center gap-2 h-[42px] px-6 rounded-full border border-black/20 text-black text-[13px] font-semibold hover:bg-black hover:text-white transition duration-300"
             >
-              <svg width="16" height="16" viewBox="0 0 21 21" fill="none">
-                <rect x="1" y="1" width="9" height="9" fill="#F25022"/>
-                <rect x="11" y="1" width="9" height="9" fill="#7FBA00"/>
-                <rect x="1" y="11" width="9" height="9" fill="#00A4EF"/>
-                <rect x="11" y="11" width="9" height="9" fill="#FFB900"/>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+                <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
               </svg>
-              Manage Microsoft Account
+              Manage SSO Security
             </a>
           </div>
 

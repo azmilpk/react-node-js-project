@@ -177,8 +177,8 @@ async function main() {
   const siteIdByName = new Map(
     (await db.all('SELECT Id, SiteName FROM Sites')).map((r) => [r.SiteName, r.Id])
   );
-  const utilityIdByName = new Map(
-    (await db.all('SELECT UtilityTypeID AS Id, UtilityName FROM UtilityTypes')).map((r) => [
+  const utilityTypeMap = new Map(
+    (await db.all('SELECT Id, UtilityName FROM UtilityTypes')).map((r) => [
       r.UtilityName,
       r.Id,
     ])

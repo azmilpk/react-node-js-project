@@ -1,8 +1,8 @@
-# TTI Ecosphere Knowledge Transfer
+# EcoSphere Knowledge Transfer
 
 ## 1. Project Overview
 
-TTI Ecosphere is an environmental reporting application for entering, validating, calculating, reviewing, and reporting utility data.
+EcoSphere is an enterprise environmental and sustainability reporting application for entering, validating, calculating, reviewing, and reporting utility and resource consumption data.
 
 The application has two parts:
 
@@ -321,7 +321,7 @@ Do not expose storage connection strings in frontend code.
 - Some audit identity fields are still accepted from the client instead of being derived entirely from `req.user`.
 - Debug endpoints should be removed or protected before production.
 - Account mappings must be maintained when new sites or utility accounts are introduced.
-- The legacy SQLite file `tti_env_report.db` is for historical reference only; Azure SQL is the active database.
+- The local SQLite file `ecosphere_report.db` provides self-contained local development support.
 - Existing `HANDOVER.md` and `AZURE_SQL_MIGRATION.md` contain historical migration information and should not be treated as the current runtime configuration.
 
 ## 16. Recommended Production Improvements

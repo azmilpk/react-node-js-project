@@ -52,7 +52,8 @@ const resolveSiteId = async (name) => {
 const resolveUtilityId = async (name) => {
   if (!name) return null;
   const row = await db.get(
-    'SELECT UtilityTypeID AS Id FROM UtilityTypes WHERE UtilityName = ?',
+    'SELECT Id FROM UtilityTypes WHERE UtilityName = ?',
+
     [name]
   );
   return row ? row.Id : null;

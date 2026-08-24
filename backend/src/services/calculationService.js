@@ -139,7 +139,7 @@ const waterWithDischarge = (useCode) => ({ cur }) => {
 
 // US natural gas: the metered value is converted straight to MWh with the
 // therm->MWh factor (1 unit = 1 therm; no CCF->therm 1.037 step), matching the
-// Volvo reference figures.
+// standard reference figures.
 const NAT_GAS_CCF_TO_MWH = 0.0293071070172;
 const KITCHEN_PROPANE_TO_LB = 4.24;
 // Plain-English description of the math behind each formula code, shown to
@@ -210,7 +210,7 @@ const INDICATOR_META = {
   WATER_DISCH:  { id: '80077162', name: 'Water sent to a municipal, or similar, water treatment facility', units: 'cubic meters' },
   LPG_STD:      { id: '65141617', name: 'LPG_Indicator', units: 'MWh' },
   PRODUCED_STD: { id: '65245956', name: 'Gearbox', units: 'Number' },
-  DIESEL_STD:   { id: '65143046', name: 'Diesel Volvo STD - Internal Transports in Energy', units: 'MWh' },
+  DIESEL_STD:   { id: '65143046', name: 'Diesel Standard - Internal Transports in Energy', units: 'MWh' },
   CONSTANT_PROP_GAS_STD: { id: '64854062', name: 'LPG, Propane/gasol - Renewable (%)', units: '%' },
 
   // ── US sites (RT100, MEC, Macungie, LVLC) — see SITE_FORMULAS above ──
@@ -224,11 +224,12 @@ const INDICATOR_META = {
   FORKLIFT_PROPANE:   { id: '65141564', name: 'LPG, Propane/gasol - Internal Transports in Mass', units: 'lb' },
   KITCHEN_PROPANE:    { id: '65141527', name: 'LPG, Propane/gasol - Heating / Cooling in Mass', units: 'lb' },
   GASOLINE_IT:        { id: '65208548', name: 'Petrol - Internal Transports in Volume', units: 'US gallon' },
-  DIESEL_PROC_GAL:    { id: '65143062', name: 'Diesel Volvo STD - Process in Volume', units: 'US gallon' },
-  DIESEL_PROC_L:      { id: '65143062', name: 'Diesel Volvo STD - Process in Volume', units: 'litre' },
-  HVO_TRANSPORT:      { id: '65143047', name: 'Diesel Volvo STD - Internal Transports in Volume', units: 'US gallon' },
+  DIESEL_PROC_GAL:    { id: '65143062', name: 'Diesel Standard - Process in Volume', units: 'US gallon' },
+  DIESEL_PROC_L:      { id: '65143062', name: 'Diesel Standard - Process in Volume', units: 'litre' },
+  HVO_TRANSPORT:      { id: '65143047', name: 'Diesel Standard - Internal Transports in Volume', units: 'US gallon' },
   PRODUCED_TRUCKS:    { id: '65245952', name: 'Trucks CBU', units: 'Number' },
 };
+
 
 // ── NRV (New River Valley, VA) ───────────────────────────────────────────────
 // NRV generates a fixed set of report lines per month. Unlike the slot-based
@@ -428,7 +429,7 @@ async function calculateAll({ site } = {}) {
            s.SiteName, u.UtilityName
     FROM Gto_Invoices g
     JOIN Sites s ON s.Id = g.SiteId
-    JOIN UtilityTypes u ON u.UtilityTypeID = g.UtilityTypeId
+    JOIN UtilityTypes u ON u.Id = g.UtilityTypeId
     WHERE g.PostingDateMonth IS NOT NULL
       ${siteId ? 'AND g.SiteId = ?' : ''}
     ORDER BY g.PostingDateMonth, s.SiteName, u.UtilityName`,
@@ -437,7 +438,7 @@ async function calculateAll({ site } = {}) {
 
   const results = [];
   // Utility-type id lookup by name, used by the guaranteed-row pass below.
-  const utilityTypeRows = await db.all('SELECT UtilityTypeID AS Id, UtilityName FROM UtilityTypes');
+  const utilityTypeRows = await db.all('SELECT Id, UtilityName FROM UtilityTypes');
   const utilityTypeByName = new Map(utilityTypeRows.map((r) => [r.UtilityName, r]));
 
   // A site+month must be 100% validated to calculate — one Pending row anywhere

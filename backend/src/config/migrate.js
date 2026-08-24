@@ -1,15 +1,60 @@
-// ─────────────────────────────────────────────────────────────────────────────
-// Azure SQL migration: schema is now managed EXTERNALLY.
-// This startup migration is intentionally disabled — the app no longer creates,
-// alters, seeds, or drops any tables/columns. Provision and evolve the schema
-// directly in Azure SQL (tables are added gradually). The legacy SQLite DDL
-// below is kept for reference only and never executes because of this return.
-// ─────────────────────────────────────────────────────────────────────────────
-console.log('Schema managed externally (Azure SQL) — startup migration skipped.');
-return;
-
-// eslint-disable-next-line no-unreachable
 const db = require('./db');
+const bcrypt = require('bcryptjs');
+
+const ensureColumn = (tableName, columnName, definition) => {
+  try {
+    db.exec(`ALTER TABLE ${tableName} ADD COLUMN ${columnName} ${definition};`);
+    console.log(`${columnName} column added to ${tableName}`);
+  } catch (error) {
+    if (error.message.includes('duplicate column name')) {
+      console.log(`${columnName} already exists in ${tableName}`);
+    } else {
+      throw error;
+    }
+  }
+};
+
+const dropColumn = (tableName, columnName) => {
+  try {
+    db.exec(`ALTER TABLE ${tableName} DROP COLUMN ${columnName};`);
+    console.log(`${columnName} column dropped from ${tableName}`);
+  } catch (error) {
+    if (error.message.includes('no such column')) {
+      // Already removed (or never existed) — nothing to do.
+    } else {
+      throw error;
+    }
+  }
+};
+
+console.log('Running SQLite startup schema migrations...');
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Users table & initial seed for local development/testing
+// ─────────────────────────────────────────────────────────────────────────────
+db.exec(`
+  CREATE TABLE IF NOT EXISTS Users (
+    Id INTEGER PRIMARY KEY AUTOINCREMENT,
+    Name TEXT NOT NULL,
+    Email TEXT NOT NULL UNIQUE,
+    Password TEXT NOT NULL,
+    Role TEXT NOT NULL DEFAULT 'SiteOwner',
+    LastLoginAt TEXT,
+    CreatedAt TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+`);
+
+ensureColumn('Users', 'LastLoginAt', 'TEXT');
+ensureColumn('Users', 'CreatedAt', 'TEXT');
+
+
+const seedUser = db.prepare(`
+  INSERT OR IGNORE INTO Users (Name, Email, Password, Role) VALUES (?, ?, ?, ?)
+`);
+
+const defaultPasswordHash = bcrypt.hashSync('password123', 10);
+seedUser.run('Site Owner Admin', 'admin@example.com', defaultPasswordHash, 'SiteOwner');
+seedUser.run('Lead Auditor', 'auditor@example.com', defaultPasswordHash, 'Auditor');
 
 db.exec('DROP TABLE IF EXISTS FormEntries;');
 
@@ -26,33 +71,6 @@ db.exec(`
   );
 `);
 
-const ensureColumn = (tableName, columnName, definition) => {
-  try {
-    db.exec(`ALTER TABLE ${tableName} ADD COLUMN ${columnName} ${definition};`);
-    console.log(`${columnName} column added to ${tableName}`);
-  } catch (error) {
-    if (error.message.includes('duplicate column name')) {
-      console.log(`${columnName} already exists in ${tableName}`);
-    } else {
-      throw error;
-    }
-  }
-};
-
-// Physically remove a column left over from a retired design. Idempotent:
-// once the column is gone, subsequent runs are a no-op.
-const dropColumn = (tableName, columnName) => {
-  try {
-    db.exec(`ALTER TABLE ${tableName} DROP COLUMN ${columnName};`);
-    console.log(`${columnName} column dropped from ${tableName}`);
-  } catch (error) {
-    if (error.message.includes('no such column')) {
-      // Already removed (or never existed) — nothing to do.
-    } else {
-      throw error;
-    }
-  }
-};
 
 /* ------------------------------------------------------------------ *
  * Improved schema (Path B): normalized lookups + typed raw/clean data
@@ -240,5 +258,8 @@ ensureColumn('UlpureData', 'SourceEntryId', 'INTEGER');
 ensureColumn('UlpureData', 'DataSource', "TEXT DEFAULT 'Calculated'");
 ensureColumn('UlpureData', 'IndicatorName', 'TEXT');
 ensureColumn('UlpureData', 'IndicatorId', 'TEXT');
+ensureColumn('UlpureData', 'RegonId', 'TEXT');
+ensureColumn('UlpureData', 'RegionName', 'TEXT');
+ensureColumn('UlpureData', 'Date', 'TEXT');
 
 console.log('Tables created successfully');
