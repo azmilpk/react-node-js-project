@@ -2,7 +2,6 @@ import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import HomePage from './pages/HomePage';
 import LoginPage from './pages/LoginPage';
 import SiteOwnerPage from './pages/SiteOwnerPage';
-import StaticFormDetailsPage from './pages/StaticFormDetailsPage';
 import FacilitySelectionPage from './pages/FacilitySelectionPage';
 import FormDetailsPage from './pages/FormDetailsPage';
 import ValidatePage from './pages/ValidatePage';
@@ -33,11 +32,6 @@ function App() {
           </ProtectedRoute>
         } />
         
-        <Route path="/static-form-details" element={
-          <ProtectedRoute allowedRoles={['SiteOwner', 'Admin']}>
-            <StaticFormDetailsPage />
-          </ProtectedRoute>
-        } />
         <Route path="/facility-selection" element={
           <ProtectedRoute allowedRoles={['SiteOwner', 'Admin']}>
             <FacilitySelectionPage />

@@ -70,7 +70,7 @@ CORS_ORIGIN=http://localhost:5173
 
 # Azure Blob Storage (required for files)
 AZURE_STORAGE_CONNECTION_STRING=your-connection-string
-AZURE_STORAGE_CONTAINER_NAME=your-container-name
+AZURE_STORAGE_CONTAINER=your-container-name
 ```
 
 For Microsoft Entra login, configure the corresponding client and tenant values in the frontend authentication configuration and the backend environment.

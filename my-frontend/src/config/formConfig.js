@@ -59,7 +59,7 @@ const directEntryForm = ({
     },
     {
       name: 'accountMeterNo',
-      label: 'Account Number / Meter No',
+      label: 'Meter Reference',
       type: 'text',
       required: true,
       defaultValue: accountMeterNoDefault,
@@ -88,7 +88,7 @@ const alphaPlantForms = {
         label: 'Facility',
         type: 'text',
         required: true,
-        defaultValue: 'Köping',
+        defaultValue: 'Alpha Plant',
       },
       {
         name: 'utility',
@@ -115,11 +115,11 @@ const alphaPlantForms = {
       
       {
         name: 'accountMeterNo',
-        label: 'Account Number / Meter No',
+        label: 'Meter Reference',
         type: 'select',
         required: true,
-        options: ['Elektricitet_billaddplatser_kWh','Elektricitet_publik lastbilsladdare_(E)_kWh'],
-        defaultValue: 'Elektricitet_billaddplatser_kWh',
+        options: ['DEMO-METER-001', 'DEMO-METER-002'],
+        defaultValue: 'DEMO-METER-001',
       },
       
       {
@@ -161,7 +161,7 @@ const alphaPlantForms = {
         label: 'Facility',
         type: 'text',
         required: true,
-        defaultValue: 'Köping',
+        defaultValue: 'Alpha Plant',
       },
       {
         name: 'utility',
@@ -188,7 +188,7 @@ const alphaPlantForms = {
    
       {
         name: 'accountMeterNo',
-        label: 'Account Number / Meter No',
+        label: 'Meter Reference',
         type: 'select',
         required: true,
         options: ['Diesel'],
@@ -233,7 +233,7 @@ const alphaPlantForms = {
         label: 'Facility',
         type: 'text',
         required: true,
-        defaultValue: 'Köping',
+        defaultValue: 'Alpha Plant',
       },
       {
         name: 'utility',
@@ -260,12 +260,12 @@ const alphaPlantForms = {
       
       {
         name: 'accountMeterNo',
-        label: 'Account Number / Meter No',
+        label: 'Meter Reference',
         type: 'select',
         required: true,
-        options: ['Huvudmätare_T_MWh','Omk.rum_mätare_T_(nya mätaren_MWh)','Härdverk_T_MWh',
-          '85148787_MWh','Graddagsfaktor_Köping_SMHI','Kompressor_återvinning _VS 3_MWh'],
-        defaultValue: 'Huvudmätare_T_MWh',
+        options: ['DEMO-METER-003', 'DEMO-METER-004', 'DEMO-METER-005',
+          'DEMO-METER-006', 'DEMO-METER-007', 'DEMO-METER-008'],
+        defaultValue: 'DEMO-METER-003',
       },
       
       {
@@ -309,7 +309,7 @@ const alphaPlantForms = {
         label: 'Facility',
         type: 'text',
         required: true,
-        defaultValue: 'Köping',
+        defaultValue: 'Alpha Plant',
       },
       {
         name: 'utility',
@@ -334,12 +334,12 @@ const alphaPlantForms = {
       },
       {
         name: 'accountMeterNo',
-        label: 'Account Number / Meter No',
+        label: 'Meter Reference',
         type: 'select',
         required: true,
-        options: ['12812696_A_verkstad','12812699_A_verkstad','12812698_A_verkstad','68511391_T_verkstad',
-          '6919964_Kyltorn_T-härd','6794762_Kyltorn_A-härd-borttagen','78102820_nödkyla_ugn_6_KB02','6 KB01'],
-        defaultValue: '12812696_A_verkstad',
+        options: ['DEMO-METER-009', 'DEMO-METER-010', 'DEMO-METER-011', 'DEMO-METER-012',
+          'DEMO-METER-013', 'DEMO-METER-014', 'DEMO-METER-015', 'DEMO-METER-016'],
+        defaultValue: 'DEMO-METER-009',
       },
       {
         name: 'meterReading',
@@ -473,11 +473,11 @@ const bravoPlantForms = {
       },
        {
         name: 'accountMeterNo',
-        label: 'Account Number / Meter No',
+        label: 'Meter Reference',
         type: 'select',
-        options: ['Solar PV array 75','Solar PV array 6'],
+        options: ['DEMO-METER-017', 'DEMO-METER-018'],
         required: true,
-        defaultValue: 'Solar PV array 75',
+        defaultValue: 'DEMO-METER-017',
       },
       {
         name: 'postingMonth',
@@ -535,17 +535,17 @@ const deltaPlantForms = {
   'energy-consumption': directEntryForm({
     utility: 'Energy Consumption',
     units: 'kWh',
-    accountMeterNoDefault: 'TEST-MAC-ENERGY-001',
+    accountMeterNoDefault: 'DEMO-METER-019',
   }),
   'natural-gas': directEntryForm({
     utility: 'Natural Gas',
     units: 'm3',
-    accountMeterNoDefault: 'TEST-MAC-NG-001',
+    accountMeterNoDefault: 'DEMO-METER-020',
   }),
   gasoline: directEntryForm({
     utility: 'Gasoline',
     units: 'litres',
-    accountMeterNoDefault: 'TEST-MAC-GASOLINE-001',
+    accountMeterNoDefault: 'DEMO-METER-021',
   }),
   'produced-units': {
     editableFields: [
@@ -580,10 +580,10 @@ const deltaPlantForms = {
       },
       {
         name: 'accountMeterNo',
-        label: 'Account Number / Meter No',
+        label: 'Meter Reference',
         type: 'text',
         required: true,
-        defaultValue: 'TEST-MAC-PU-001',
+        defaultValue: 'DEMO-METER-022',
       },
       {
         name: 'producedQuantity',

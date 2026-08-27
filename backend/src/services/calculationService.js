@@ -28,7 +28,7 @@ const calculateAll = async ({ site } = {}) => {
        JOIN Sites s ON s.Id = g.SiteId
        LEFT JOIN UtilityTypes u ON u.Id = g.UtilityTypeId
       WHERE g.PostingDateMonth IS NOT NULL
-        AND g.Hitl IN ('Validated', 'Modified and Validated')
+        AND g.Status IN ('Validated', 'Modified and Validated')
         ${siteRow ? 'AND g.SiteId = ?' : ''}
       GROUP BY g.SiteId, g.UtilityTypeId, g.PostingDateMonth, s.SiteName, u.UtilityName
       ORDER BY g.PostingDateMonth, s.SiteName, u.UtilityName`,
@@ -43,7 +43,7 @@ const calculateAll = async ({ site } = {}) => {
                 MAX(Units) AS units
            FROM Gto_Invoices
           WHERE SiteId = ? AND UtilityTypeId = ? AND PostingDateMonth = ?
-            AND Hitl IN ('Validated', 'Modified and Validated')`,
+            AND Status IN ('Validated', 'Modified and Validated')`,
         [combination.SiteId, combination.UtilityTypeId, combination.month]
       );
 

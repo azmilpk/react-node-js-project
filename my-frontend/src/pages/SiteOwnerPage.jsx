@@ -78,7 +78,7 @@ function SiteOwnerPage() {
 
   const handleEnterData = () => {
     setError('');
-    navigate('/static-form-details', {
+    navigate('/facility-selection', {
       state: {
         facility: selectedFacility,
         site: selectedSite,
