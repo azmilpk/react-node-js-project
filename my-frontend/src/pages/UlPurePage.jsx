@@ -18,8 +18,8 @@ const VALUE_SLOT_EXPLANATION =
   "A 'Value Slot' (V1, V2, V3, …) is one raw meter/account reading imported for the site and month. " +
   'A utility can have several meters in the same month (e.g. two water meters), each landing in its own slot — ' +
   'the formula below shows exactly how those slots are combined to produce this indicator.';
-const NRV_SOURCE_EXPLANATION =
-  'NRV does not use meter Value Slots. Instead, this number is the total of every invoice row recorded for the ' +
+const AGGREGATE_SOURCE_EXPLANATION =
+  'This aggregate entry does not use meter value slots. Instead, this number is the total of every source reading recorded for the ' +
   'site and month that matches this indicator\u2019s category (e.g. all rows tagged "Diesel") \u2014 listed below so you can see exactly what was added up.';function UlPurePage() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -415,7 +415,7 @@ useEffect(() => {
                 type="button"
                 className="h-[40px] px-5 rounded-full bg-black text-white text-[13px] font-semibold hover:bg-neutral-800 transition duration-300"
               >
-                Generate ULpure Report
+                Generate Report
               </button>
             </div>
           </div>
@@ -478,7 +478,7 @@ useEffect(() => {
                   {formulaSources?.mode === 'aggregate' ? 'Source Rows' : 'Value Slots'}
                 </h3>
                 <p className="text-[13px] text-black/70 leading-relaxed">
-                  {formulaSources?.mode === 'aggregate' ? NRV_SOURCE_EXPLANATION : VALUE_SLOT_EXPLANATION}
+                  {formulaSources?.mode === 'aggregate' ? AGGREGATE_SOURCE_EXPLANATION : VALUE_SLOT_EXPLANATION}
                 </p>
                 {formulaSources && (
                   <div className="mt-3 space-y-2">

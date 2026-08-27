@@ -80,7 +80,7 @@ const directEntryForm = ({
   ],
 });
 
-const kopingForms = {
+const alphaPlantForms = {
   electricity: {
     editableFields: [
       {
@@ -438,7 +438,7 @@ const kopingForms = {
   },
 };
 
-const nrvForms = {
+const bravoPlantForms = {
   'renewable-electricity': {
     editableFields: [
       {
@@ -446,7 +446,7 @@ const nrvForms = {
         label: 'Facility',
         type: 'text',
         required: true,
-        defaultValue: 'NRV',
+        defaultValue: 'Bravo Plant',
       },
       {
         name: 'utility',
@@ -513,25 +513,25 @@ const nrvForms = {
   },
 };
 
-const lvlcForms = {
+const charliePlantForms = {
   'energy-consumption': directEntryForm({
     utility: 'Energy Consumption',
     units: 'kWh',
-    accountMeterNoDefault: 'TEST-LVLC-ENERGY-001',
+    accountMeterNoDefault: 'DEMO-METER-001',
   }),
   'natural-gas': directEntryForm({
     utility: 'Natural Gas',
     units: 'm3',
-    accountMeterNoDefault: 'TEST-LVLC-NG-001',
+    accountMeterNoDefault: 'DEMO-METER-002',
   }),
   propane: directEntryForm({
     utility: 'Propane',
     units: 'liters',
-    accountMeterNoDefault: 'TEST-LVLC-PROP-001',
+    accountMeterNoDefault: 'DEMO-METER-003',
   }),
 };
 
-const macungieForms = {
+const deltaPlantForms = {
   'energy-consumption': directEntryForm({
     utility: 'Energy Consumption',
     units: 'kWh',
@@ -602,57 +602,57 @@ const macungieForms = {
   },
 };
 
-const mecForms = {
+const echoPlantForms = {
   'energy-consumption': directEntryForm({
     utility: 'Energy Consumption',
     units: 'kWh',
-    accountMeterNoDefault: 'TEST-MEC-ENERGY-001',
+    accountMeterNoDefault: 'DEMO-METER-007',
   }),
   propane: directEntryForm({
     utility: 'Propane',
     units: 'litres',
-    accountMeterNoDefault: 'TEST-MEC-PROP-001',
+    accountMeterNoDefault: 'DEMO-METER-008',
   }),
   'natural-gas': directEntryForm({
     utility: 'Natural Gas',
     units: 'm3',
-    accountMeterNoDefault: 'TEST-MEC-NG-001',
+    accountMeterNoDefault: 'DEMO-METER-009',
   }),
   diesel: directEntryForm({
     utility: 'Diesel',
     units: 'litres',
-    accountMeterNoDefault: 'TEST-MEC-DIESEL-001',
+    accountMeterNoDefault: 'DEMO-METER-010',
   }),
   water: directEntryForm({
     utility: 'Water',
     units: 'm3',
-    accountMeterNoDefault: 'TEST-MEC-WATER-001',
+    accountMeterNoDefault: 'DEMO-METER-011',
   }),
 };
 
-const rt100Forms = {
+const foxtrotPlantForms = {
   'energy-consumption': directEntryForm({
     utility: 'Energy Consumption',
     units: 'kWh',
-    accountMeterNoDefault: 'TEST-RT100-ENERGY-001',
+    accountMeterNoDefault: 'DEMO-METER-004',
   }),
   'natural-gas': directEntryForm({
     utility: 'Natural Gas',
     units: 'm3',
-    accountMeterNoDefault: 'TEST-RT100-NG-001',
+    accountMeterNoDefault: 'DEMO-METER-005',
   }),
   water: directEntryForm({
     utility: 'Water',
     units: 'm3',
-    accountMeterNoDefault: 'TEST-RT100-WATER-001',
+    accountMeterNoDefault: 'DEMO-METER-006',
   }),
 };
 
 export const formConfigBySiteUtility = {
-  'Köping': kopingForms,
-  'NRV': nrvForms,
-  'LVLC': lvlcForms,
-  'Macungie': macungieForms,
-  'MEC': mecForms,
-  'RT100': rt100Forms,
+  'Alpha Plant': alphaPlantForms,
+  'Bravo Plant': bravoPlantForms,
+  'Charlie Plant': charliePlantForms,
+  'Delta Plant': deltaPlantForms,
+  'Echo Plant': echoPlantForms,
+  'Foxtrot Plant': foxtrotPlantForms,
 };

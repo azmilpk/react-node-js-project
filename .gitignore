@@ -12,6 +12,9 @@ build
 **/dist
 **/build
 
+# private project handover material
+docs/
+
 # logs
 npm-debug.log*
 yarn-debug.log*

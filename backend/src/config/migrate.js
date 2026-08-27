@@ -168,7 +168,7 @@ const seedUtility = db.prepare(
   'Energy Consumption',
   'Renewable Electricity',
   'Produced Units',
-  // US site utilities (RT100, MEC, Macungie, LVLC)
+// Demo site utilities
   'Forklift Propane',
   'Kitchen Propane',
   'HVO Diesel Transport',
@@ -177,7 +177,7 @@ const seedUtility = db.prepare(
 ].forEach((name) => seedUtility.run(name));
 
 const seedSite = db.prepare('INSERT OR IGNORE INTO Sites (SiteName) VALUES (?)');
-['Köping', 'NRV', 'LVLC', 'Macungie', 'MEC', 'RT100'].forEach((name) =>
+['Alpha Plant', 'Bravo Plant', 'Charlie Plant', 'Delta Plant', 'Echo Plant', 'Foxtrot Plant'].forEach((name) =>
   seedSite.run(name)
 );
 
@@ -186,12 +186,12 @@ ensureColumn('Sites', 'RegonId', 'TEXT');
 const setRegonId = db.prepare(
   "UPDATE Sites SET RegonId = ? WHERE SiteName = ? AND (RegonId IS NULL OR RegonId = '')"
 );
-setRegonId.run('64854062', 'Köping');
-setRegonId.run('64854091', 'NRV');
-setRegonId.run('80262282', 'LVLC');
-setRegonId.run('64854089', 'Macungie');
-setRegonId.run('76109541', 'MEC');
-setRegonId.run('80262304', 'RT100');
+setRegonId.run('DEMO-001', 'Alpha Plant');
+setRegonId.run('DEMO-002', 'Bravo Plant');
+setRegonId.run('DEMO-003', 'Charlie Plant');
+setRegonId.run('DEMO-004', 'Delta Plant');
+setRegonId.run('DEMO-005', 'Echo Plant');
+setRegonId.run('DEMO-006', 'Foxtrot Plant');
 
 /* ------------------------------------------------------------------ *
  * Make UlpureData able to fully stand in for UlPureEntries:

@@ -153,9 +153,9 @@ useEffect(() => {
   // Köping values are shown with at most 3 decimals; other sites keep their raw value.
   const formatConsumption = (row) => {
     const site = (row.site || '').trim().toLowerCase();
-    const isKoping = site === 'köping' || site === 'koping';
+    const isAlphaPlant = site === 'alpha plant';
     const value = Number(row.consumption);
-    if (!isKoping || !Number.isFinite(value)) return row.consumption;
+    if (!isAlphaPlant || !Number.isFinite(value)) return row.consumption;
     return Math.round(value * 1000) / 1000;
   };
 
@@ -533,7 +533,7 @@ useEffect(() => {
                   disabled={generating}
                   className="h-[40px] px-5 rounded-full bg-black text-white text-[13px] font-semibold hover:bg-neutral-800 transition duration-300 self-start sm:self-auto disabled:opacity-60 disabled:cursor-not-allowed"
                 >
-                  {generating ? 'Generating…' : 'Generate ULpure Data'}
+                  {generating ? 'Generating…' : 'Generate Reporting Data'}
                 </button>
               )}
             </div>

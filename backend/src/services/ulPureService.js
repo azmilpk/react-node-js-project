@@ -1,7 +1,7 @@
 const db = require('../config/db');
 const { ids: REGON_IDS, names: REGION_NAMES } = require('../config/regonIds');
 const { logFieldChanges } = require('./auditService');
-const { calculateAll, prevMonth, FORMULA_DESCRIPTIONS, NRV_SUM_UTILITIES } = require('./calculationService');
+const { calculateAll, prevMonth, FORMULA_DESCRIPTIONS, AGGREGATE_SUM_UTILITIES } = require('./calculationService');
 
 // Aliased column list mapping the real tbl_ulpure_data columns to the field
 // names the UL Pure controllers / frontend expect. Columns confirmed absent
@@ -192,7 +192,7 @@ const moveModifiedValidatedEntriesToUlPure = async ({
 
   // Köping needs COMPLETE data — its delta indicators (Water, District Heating)
   // compare against the previous month, so every row must be validated. Other
-  // sites (NRV, US subsites) are pass-through / aggregation and can generate
+  // Aggregate-mode sites can generate
   // from whatever is validated: they only require at least one validated entry;
   // pending rows are simply not blocked.
   if (site === 'Köping') {
@@ -373,11 +373,11 @@ const fetchRawDataForUlPureEntry = async (id) => {
 
   const currentMonth = entry.PostingDateMonth;
 
-  // NRV (aggregate mode) rows have no UtilityTypeId/ValueSlot — they're a
+  // Aggregate-mode rows have no UtilityTypeId/ValueSlot — they're a
   // SUM(Consumption) over rows matching the formula's TemplateType filter, and
   // don't need a previous month (no delta math), so only the current month applies.
   if (entry.UtilityTypeId == null) {
-    const sumConfig = NRV_SUM_UTILITIES.find((s) => s.code === entry.FormulaCode);
+    const sumConfig = AGGREGATE_SUM_UTILITIES.find((s) => s.code === entry.FormulaCode);
     const rows = sumConfig && currentMonth
       ? await db.all(
           `SELECT ${RAW_COLUMNS} FROM Gto_Invoices

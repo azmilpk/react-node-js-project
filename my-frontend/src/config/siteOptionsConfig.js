@@ -1,7 +1,6 @@
 // src/config/siteOptionsConfig.js
 export const siteOptions = {
-  'Köping': ['Köping'],
-  'NRV': ['NRV'],
-  'LVO': ['LVLC', 'MEC', 'RT100', 'Macungie'],
-  // ... all facilities and their sites
+  'Alpha Plant': ['Alpha Plant'],
+  'Bravo Plant': ['Bravo Plant'],
+  'Demo Portfolio': ['Charlie Plant', 'Delta Plant', 'Echo Plant', 'Foxtrot Plant'],
 };

@@ -11,7 +11,7 @@ const CACHE_KEY = 'auditorUlPurePage_cache';
                         
 function AuditorUlPurePage() {
     const navigate = useNavigate();
-  const LVO_SUBSITES = ['LVLC', 'MEC', 'RT100', 'Macungie'];
+  const DEMO_PORTFOLIO_SITES = ['Charlie Plant', 'Delta Plant', 'Echo Plant', 'Foxtrot Plant'];
 
   const [tableData, setTableData] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -141,8 +141,8 @@ function AuditorUlPurePage() {
   }, [tableData, siteFilter, utilityFilter, monthFilter, yearFilter]);
 
   const siteOptions = [...new Set(tableData.map((row) => row.site).filter(Boolean))];
-    const otherSiteOptions = siteOptions.filter((site) => !LVO_SUBSITES.includes(site));
-  const lvoSiteOptions = siteOptions.filter((site) => LVO_SUBSITES.includes(site));
+  const otherSiteOptions = siteOptions.filter((site) => !DEMO_PORTFOLIO_SITES.includes(site));
+  const portfolioSiteOptions = siteOptions.filter((site) => DEMO_PORTFOLIO_SITES.includes(site));
   const utilityOptions = [...new Set(tableData.map((row) => row.utility).filter(Boolean))];
   const yearOptions = [
     ...new Set(
@@ -185,7 +185,7 @@ function AuditorUlPurePage() {
         <section className="w-full max-w-[1450px] mx-auto">
           <div className="flex items-center justify-between mb-6">
             <h1 className="text-[28px] sm:text-[36px] lg:text-[44px] xl:text-[48px] leading-tight font-bold text-black">
-              UL PURE DATA
+              REPORTING DATA
             </h1>
 
             <button
@@ -214,9 +214,9 @@ function AuditorUlPurePage() {
                       {regionFullName(site)}
                     </option>
                   ))}
-                  {lvoSiteOptions.length > 0 && (
-                    <optgroup label="LVO">
-                      {lvoSiteOptions.map((site) => (
+                  {portfolioSiteOptions.length > 0 && (
+                    <optgroup label="Demo Portfolio">
+                      {portfolioSiteOptions.map((site) => (
                         <option key={site} value={site}>
                           {regionFullName(site)}
                         </option>

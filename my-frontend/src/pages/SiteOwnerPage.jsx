@@ -11,9 +11,9 @@ import fileDashboardIcon from '../assets/siteownervectors/files.svg';
 const SITE_CACHE_KEY = 'siteOwner_selection';
 
 const siteOptions = {
-  'Köping': ['Köping'],
-  'NRV': ['NRV'],
-  'LVO': ['LVLC', 'MEC', 'RT100', 'Macungie'],
+  'Alpha Plant': ['Alpha Plant'],
+  'Bravo Plant': ['Bravo Plant'],
+  'Demo Portfolio': ['Charlie Plant', 'Delta Plant', 'Echo Plant', 'Foxtrot Plant'],
 };
 
 function SiteOwnerPage() {
@@ -58,8 +58,8 @@ function SiteOwnerPage() {
 
     if (subSites.length === 1) {
       setSelectedSite(subSites[0]);
-    } else if (value === 'LVO') {
-      setSelectedSite('LVLC');
+    } else if (value === 'Demo Portfolio') {
+      setSelectedSite('Charlie Plant');
     } else {
       setSelectedSite('');
     }
@@ -117,7 +117,7 @@ function SiteOwnerPage() {
     });
   };
 
-  const handleUlPure = () => {
+  const handleReporting = () => {
     if (!selectedFacility || !selectedSite) {
       setError('Please select both facility and site.');
       return;
@@ -152,10 +152,10 @@ function SiteOwnerPage() {
       action: handleDashboard,
     },
     {
-      title: 'UL Pure',
+      title: 'Reporting',
       desc: 'Access validated data and reporting details.',
       icon: checkData2Icon,
-      action: handleUlPure,
+      action: handleReporting,
     },
   ];
 

@@ -1,4 +1,4 @@
-const kopingUtilities = [
+const alphaPlantUtilities = [
   {
     utilityCode: 'electricity',
     utilityName: 'Electricity',
@@ -31,7 +31,7 @@ const kopingUtilities = [
   },
 ];
 
-const nrvUtilities = [
+const bravoPlantUtilities = [
   {
     utilityCode: 'renewable-electricity',
     utilityName: 'Renewable Electricity',
@@ -40,7 +40,7 @@ const nrvUtilities = [
   },
 ];
 
-const lvlcUtilities = [
+const charliePlantUtilities = [
   {
     utilityCode: 'energy-consumption',
     utilityName: 'Energy Consumption',
@@ -61,7 +61,7 @@ const lvlcUtilities = [
   },
 ];
 
-const macungieUtilities = [
+const deltaPlantUtilities = [
   {
     utilityCode: 'energy-consumption',
     utilityName: 'Energy Consumption',
@@ -88,7 +88,7 @@ const macungieUtilities = [
   },
 ];
 
-const mecUtilities = [
+const echoPlantUtilities = [
   {
     utilityCode: 'energy-consumption',
     utilityName: 'Energy Consumption',
@@ -121,7 +121,7 @@ const mecUtilities = [
   },
 ];
 
-const rt100Utilities = [
+const foxtrotPlantUtilities = [
   {
     utilityCode: 'energy-consumption',
     utilityName: 'Energy Consumption',
@@ -143,10 +143,10 @@ const rt100Utilities = [
 ];
 
 export const siteUtilityConfig = {
-  'Köping': kopingUtilities,
-  'NRV': nrvUtilities,
-  'LVLC': lvlcUtilities,
-  'Macungie': macungieUtilities,
-  'MEC': mecUtilities,
-  'RT100': rt100Utilities,
+  'Alpha Plant': alphaPlantUtilities,
+  'Bravo Plant': bravoPlantUtilities,
+  'Charlie Plant': charliePlantUtilities,
+  'Delta Plant': deltaPlantUtilities,
+  'Echo Plant': echoPlantUtilities,
+  'Foxtrot Plant': foxtrotPlantUtilities,
 };

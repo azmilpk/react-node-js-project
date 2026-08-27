@@ -36,51 +36,20 @@ const FORMULA_CODE_BY_UTILITY = {
   'Produced Units': 'PRODUCED_STD',
 };
 
-// Account/meter name -> ValueSlot used by the calc formulas. Must stay in sync
-// with ACCOUNT_VALUE_SLOT in scripts/importGtoInvoices.js. Single-value
-// utilities (LPG/Diesel/Produced Units) have no meter picker, so they fall back
-// to 'V1', which is the slot their formulas read.
+// Generic demo meter reference -> value slot. Keep real meter mappings outside
+// the public project.
 const ACCOUNT_VALUE_SLOT = {
-  // Electricity
-  'Elektricitet, totalt A+T kWh': 'V1',
-  'Elektricitet_billaddplatser_kWh': 'V2',
-  'Elektricitet, publik lastbilsladdare (T3) kWh': 'V3',
-  'Elektricitet_publik lastbilsladdare_(E)_kWh': 'V4',
-  'Elförbruk E-hallen kWh': 'V5',
-  // District Heating
-  'Huvudmätare_T_MWh': 'V1',
-  'Omk.rum_mätare_T_(nya mätaren_MWh)': 'V2',
-  'Kompressor_återvinning _VS 3_MWh': 'V3',
-  'Härdverk_T_MWh': 'V4',
-  '85148787_MWh': 'V5',
-  'Graddagsfaktor_Köping_SMHI': 'V6',
-  'Verklig_Energi_Patrik': 'V13',
-  // Water
-  '12812696_A_verkstad': 'V1',
-  '12812699_A_verkstad': 'V2',
-  '12812698_A_verkstad': 'V3',
-  '68511391_T_verkstad': 'V4',
-  '6919964_Kyltorn_T-härd': 'V9',
-  '6794762_Kyltorn_A-härd-borttagen': 'V10',
-  '78102820_nödkyla_ugn_6_KB02': 'V11',
-  '6 KB01': 'V12',
-  'GKN_Water': 'V15',
-  'Stena_Fosfateringsvatten': 'V16',
-  'Stena_Emulsioner': 'V17',
-  'E-hallen_förbrukning_m3': 'V18',
-  // single-value utilities
-  'LPG_Propane_Gasoline': 'V1',
-  'Produced Units': 'V1',
+  'METER-001': 'V1',
+  'METER-002': 'V2',
+  'METER-003': 'V3',
 };
 
-const US_SITES = new Set(['RT100', 'MEC', 'Macungie', 'LVLC']);
+const MULTI_METER_SITES = new Set(['Charlie Plant', 'Delta Plant', 'Echo Plant', 'Foxtrot Plant']);
 
-// Compute the ValueSlot a manual entry occupies. US sites can have several
-// meters for one utility in the same month; their formulas sum all slots, so
-// each meter gets a distinct, stable slot (its meter no, else a unique seed).
-// Köping uses its fixed meter-picker slot map.
+// Compute the value slot for a manual entry. Multi-meter demo sites receive a
+// stable slot per meter reference; all other sites use the generic slot map.
 const resolveValueSlot = (siteCode, accountMeterNo, slotSeed) => {
-  if (US_SITES.has(siteCode)) {
+  if (MULTI_METER_SITES.has(siteCode)) {
     return accountMeterNo || slotSeed;
   }
   return ACCOUNT_VALUE_SLOT[accountMeterNo] || 'V1';
@@ -95,7 +64,7 @@ const ENTRY_COLUMNS = `
   g.Id AS Id,
   s.SiteName AS SiteCode,
   s.SiteName AS Site,
-  CASE WHEN s.SiteName = 'NRV' THEN s.SiteName ELSE g.Facility END AS FacilityCode,
+  CASE WHEN s.SiteName = 'Bravo Plant' THEN s.SiteName ELSE g.Facility END AS FacilityCode,
   g.TemplateType AS UtilityName,
   g.Postingdatemonth AS PostingMonth,
   g.Accountnumber AS AccountMeterNo,
@@ -154,9 +123,8 @@ const insertFormEntry = async (data) => {
     validateUser: data.validateUser || null,
     validatorLoginTime: data.validatorLoginTime || null,
     approver: data.approver || null,
-    // Köping Water constants; other sites/utilities leave these NULL.
-    freshWater: (siteCode === 'Köping' && utilityName === 'Water') ? 0.9 : null,
-    evaporation: (siteCode === 'Köping' && utilityName === 'Water') ? 1.25 : null,
+    freshWater: (siteCode === 'Alpha Plant' && utilityName === 'Water') ? 0.9 : null,
+    evaporation: (siteCode === 'Alpha Plant' && utilityName === 'Water') ? 1.25 : null,
     utilityTypeId,
     siteId,
     templateType: utilityName,
