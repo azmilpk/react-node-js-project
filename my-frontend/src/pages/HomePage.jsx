@@ -1,6 +1,6 @@
 import { useNavigate } from 'react-router-dom';
 import TopNavbar from '../components/topnavbar/TopNavbar';
-import homeImage from '../assets/images/final.jpg';
+import homeImage from '../assets/images/lfinal.png';
 import ecoLogo from '../assets/images/ecoLogo.svg';
 
 function HomePage() {
@@ -26,12 +26,12 @@ function HomePage() {
 
   return (
     <div className="w-full h-screen overflow-hidden flex flex-col bg-black">
-      <main
-        className="relative flex-1 min-h-0 bg-cover bg-center bg-no-repeat"
-        style={{
-          backgroundImage: `url(${homeImage})`,
-        }}
-      >
+  <main
+className="relative flex-1 min-h-0 bg-cover bg-center bg-no-repeat"  style={{
+    backgroundImage: `url(${homeImage})`,
+  }}
+>
+    
         <div className="absolute inset-0 bg-black/45" />
 
         <div className="relative z-10 h-full w-full flex items-center justify-center lg:justify-end px-4 sm:px-8 lg:px-16">

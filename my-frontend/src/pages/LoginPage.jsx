@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useMsal } from '@azure/msal-react';
 import TopNavbar from '../components/topnavbar/TopNavbar';
-import loginBg from '../assets/images/login1.jpg';
+import loginBg from '../assets/images/pop.png';
 import showIcon from '../assets/images/show.svg';
 import { API_BASE_URL } from '../config/api';
 import { loginRequest } from '../config/authConfig';
